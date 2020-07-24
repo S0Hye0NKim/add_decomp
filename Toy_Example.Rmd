@@ -1,0 +1,182 @@
+---
+title: "Toy Example"
+author: "Sohyeon Kim"
+date: "7/21/2020"
+output: 
+  github_document:
+    pandoc_args: --webtex
+header-includes:
+  - \usepackage{kotex}
+---
+
+```{r warning = FALSE, message = FALSE}
+library(tidyverse)
+library(ggplot2)
+library(splines)
+```
+
+
+# Initial Setting
+
+$$\begin{aligned}Y &\in \mathbb{R}^{n\times g}\\Y &= XB(\tau) + \epsilon(\tau) , \; X\sim N(0, 1)\\ X &\in\mathbb{R}^{n \times (p+1)}, \; \;B(\tau) \in \mathbb{R}^{(p+1)\times g} , \; and \; Q_\tau(\epsilon(\tau)|X) = 0\end{aligned}$$
+
+$$\begin{aligned}\beta_0(\tau) &= \beta_0 + Q_\tau(\epsilon) \\ \epsilon(\tau) &= \epsilon- Q_\tau(\epsilon), \; \epsilon \sim N(0, 0.1^2)\end{aligned}$$
+
+ * n : # of observation. 
+ * m : # of group. 
+ * p : # of covariate. 
+ * r : nonzero entry in true $B(\tau)$
+ * K : # of basis function.
+ * b : # of regional quantiel we consider.
+ 
+For toy example, I will use n = 300, p = 50, g = 20.
+
+```{r}
+set.seed(0)
+n <- 300
+m <- 20
+p <- 50
+r <- 30
+b <- 20
+
+X <- matrix(rnorm(n*p, mean = 0, sd = 1), nrow = n) %>% cbind(1, .)     #add intercept term in X
+true_B <- matrix(0, nrow = p+1, ncol = m) 
+nonzero_row <- sample(1:(p+1), size = r, replace = TRUE)
+nonzero_col <- c(1:m, sample(1:m, size = r - m, replace = TRUE))
+for(i in 1:r) {true_B[nonzero_row[i], nonzero_col[i]] = rnorm(n = 1, mean = 3, sd = 1)}
+
+eps <- matrix(rnorm(n*m, mean = 0, sd = 0.1), nrow = n)
+tau <- 0.5
+true_B_tau <- true_B
+true_B_tau[1, ] <- true_B[1, ] + qnorm(tau, mean = 0, sd = 0.1)
+eps_tau <- eps - qnorm(tau, mean = 0, sd = 0.1)
+
+Y <- X%*%true_B_tau + eps_tau
+```
+
+$B(\tau)$는 각 열들을 기준으로 최소 1개의 non-zero entry, 하지만 특정 행에 대해서는 모두 0인 값을 가진다. 
+
+
+## Question
+
+ 1. Y를 generate할 때, 사용하는 $B(\tau)$ 값에 tau depend? 
+ 2. 우선 $\tau = 0.5$ 로 generate 시켰는데, 이렇게 하는게 맞나? 
+ 
+# Check function
+
+```{r}
+check_ft <- function(x, tau) {
+  z <- ifelse(x<0, (tau-1)*x, tau*x)
+  return(z)
+}
+```
+
+$$\rho_\tau(x) = (\tau - \mathbb{I}(x<0))x$$
+
+# Basis function
+
+```{r}
+knot <- 10
+degree <- 3
+K <- knot + degree + 1 # the number of basis function
+
+tau_seq <- seq(from = 0.25, to = 0.75, length.out = b + 1) 
+Phi <- bs(tau_seq, df = K, intercept = TRUE)
+```
+
+
+## Questions
+  1. tau seq 이렇게 설정하는게 맞나?
+  2. degree of freedom 설정
+
+$$\begin{aligned}\boldsymbol{v}_i^{(\ell)} &= (\boldsymbol{x}_i \otimes \Phi(\tau_{\ell}))^T\\ &=(\Phi(\tau_\ell)^T, x_{i1}\Phi(\tau_\ell)^T, \dots, x_{ip}\Phi(\tau_\ell)^T) \\ &\in \mathbb{R}^{(p+1)K}\end{aligned}$$
+
+# New design matrix for regional quantile
+
+```{r}
+V <- list()
+for(l in 1:b){
+  V_l <- matrix(nrow = n, ncol = (p+1)*K)
+  for(i in 1:n) {
+    v_i_l <- kronecker(X[i, ], Phi[l, ])
+    V_l[i, ] <- v_i_l 
+  }
+  V[[l]] <- V_l
+}
+```
+
+
+ * Dimension for V : $b \times n \times (p+1)K$
+
+$$\boldsymbol{V}^{(\ell)} = \begin{bmatrix} v_1^{(\ell)} \\v_2^{(\ell)} \\ \vdots \\ v_n^{(\ell)}\end{bmatrix} \in \mathbb{R}^{n\times (p+1)K}$$
+
+# Initial value for estimator
+
+
+$$\boldsymbol{\eta}^{(g)}, \boldsymbol{\theta}^{(g)}, \boldsymbol{w}^{(g)}\in \mathbb{R}^{(p+1)\times K}\\ \boldsymbol{\alpha}^{(g)} \in \mathbb{R}^{p+1} \\ \boldsymbol{e}^{(\ell)(g)}, \boldsymbol{u}^{(\ell)(g)}, \in \mathbb{R}^{n}\\subject\; to \; \boldsymbol{\eta}^{(g)} - \boldsymbol{\theta}^{(g)} = 0, \; and \;\boldsymbol{Y}^{(g)} - \boldsymbol{X}\boldsymbol{\alpha}^{(g)} - \boldsymbol{V}^{(\ell)}\boldsymbol{\eta}^{(g)} - \boldsymbol{e}^{(\ell)(g)} = 0$$
+
+
+```{r}
+eta_init <- matrix(rpois(m*(p+1)*K, lambda = 5), nrow = (p+1)*K, ncol = m) # theta와 동일하게?
+theta_init <- matrix(rpois(m*(p+1)*K, lambda = 3), nrow = (p+1)*K, ncol = m) # Quant reg값?
+alpha_init <- matrix(1, nrow = p+1, ncol = m)
+e_init <- list()
+for(l in 1:b) {e_init[[l]] <- Y - X %*% alpha_init - V[[l]] %*% eta_init}
+u_init <- matrix(1, nrow = n, ncol = 1)
+w_init <- matrix(1, nrow = (p+1)*K, ncol = 1)
+```
+
+
+## Question
+  1. dual problem 전개할 때, $\theta_0 = \eta_0, \;e_0 = Y-X\alpha=V-\eta$ ??? 초기값 설정 어떻게?
+    -> 우선 $\theta, \eta$는 각각 설정하고, e는 equality condition과 동일하게 설정.
+  2. Objective function이 convex한지? convex 안하면 초기값에 따라 local에 빠질 수도... global을 찾자!
+
+
+# closed form
+
+### Closed form for eta.
+
+$$\begin{aligned}\frac{\partial Q}{\partial\boldsymbol{\eta}^{(g)T}}&=-\sum_{\ell}^b \boldsymbol{V}^{(\ell)T}\boldsymbol{u}^{(\ell)}-\delta\sum_{\ell=1}^bV^{(\ell)T}(\boldsymbol{Y}-\boldsymbol{X}\boldsymbol{\alpha}-\boldsymbol{e}^{(\ell)})+\delta\sum_{\ell}^b\boldsymbol{V}^{(\ell)T}\boldsymbol{V}^{(\ell)}\boldsymbol{\eta^{(g)}}-\boldsymbol{w}+\delta\boldsymbol{\eta}^{(g)}-\delta\boldsymbol{\theta}\\&=0\\\hat{\boldsymbol{\eta}}^{(g)}&=\frac{1}{\delta}(\sum_{\ell}^b\boldsymbol{V}^{(\ell)T}\boldsymbol{V}^{(\ell)}+\boldsymbol{I})^{-1}(\boldsymbol{w}+\delta\boldsymbol{\theta}+\sum_{\ell}^b\boldsymbol{V}^{(\ell)T}\boldsymbol{u}+\delta\sum_{\ell}^b\boldsymbol{V}^{(\ell)T}(\boldsymbol{Y}-\boldsymbol{X}\boldsymbol{\alpha}-\boldsymbol{e}))\end{aligned}$$
+
+### Closed form for theta
+
+$$\begin{aligned}\frac{\partial Q}{\partial \boldsymbol{\theta}^{(g)T}}&=\boldsymbol{w}+\delta\boldsymbol{\theta}-\delta\boldsymbol{\eta}+\frac{\partial \lambda_2||\boldsymbol{\theta}||_2}{\partial\boldsymbol{\theta}}\\&=\boldsymbol{w}+\delta\boldsymbol{\theta}-\delta\boldsymbol{\eta}+\lambda_2\frac{\boldsymbol{\theta}}{||\boldsymbol{\theta}||_2}, \; when\; \boldsymbol{\theta} \ne 0\\&=0\\\hat{\boldsymbol{\theta}}&=(\delta+\frac{\lambda_2}{||\boldsymbol{\theta}||_2})^{-1}(\delta\boldsymbol{\eta}-\boldsymbol{w})\end{aligned}$$
+
+Closed form for $\theta$
+-> penalty term 미분...?
+
+
+
+### Closed form for alpha
+
+$$\begin{aligned} \frac{\partial Q}{\partial \alpha^{(g)T}} &= -\sum_{\ell}^b\boldsymbol{X}\boldsymbol{u}^{(\ell)} -\delta\boldsymbol{X}^T\sum_{\ell}^b(\boldsymbol{Y} - \boldsymbol{V}^{(\ell)}\boldsymbol{\eta} - \boldsymbol{e}^{(\ell)}) + \delta\boldsymbol{X}^T\boldsymbol{X}\boldsymbol{\alpha} + \frac{\partial \lambda_1||\boldsymbol{A}||_*}{\partial \boldsymbol{\alpha}} \\ &= 0\end{aligned}$$
+
+
+Closed form for $\alpha$
+-> penalty term 미분...?
+
+## Questions
+  1. Penalty term 미분 어떻게??
+  2. check function 미분 어떻게??
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
