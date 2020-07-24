@@ -176,43 +176,28 @@ w_init <- matrix(1, nrow = (p+1)*K, ncol = 1)
 
 # closed form
 
-  
-![ \\frac{\\partial Q}{\\partial \\boldsymbol{\\eta}^{(g)T}} =
--\\sum\_{\\ell}^b \\boldsymbol{V}^{(\\ell)T} \\boldsymbol{u}^{(\\ell)} -
-\\delta\\sum\_{\\ell=1}^bV^{(\\ell)T}(\\boldsymbol{Y} -
-\\boldsymbol{X}\\boldsymbol{\\alpha} -
-\\boldsymbol{e}^{(\\ell)})+\\delta\\sum\_{\\ell}^b\\boldsymbol{V}^{(\\ell)T}\\boldsymbol{V}^{(\\ell)}\\boldsymbol{\\eta^{(g)}}
-- \\boldsymbol{w} + \\delta\\boldsymbol{\\eta}^{(g)} -
-\\delta\\boldsymbol{\\theta} = 0
-](https://latex.codecogs.com/png.latex?%20%5Cfrac%7B%5Cpartial%20Q%7D%7B%5Cpartial%20%5Cboldsymbol%7B%5Ceta%7D%5E%7B%28g%29T%7D%7D%20%3D%20-%5Csum_%7B%5Cell%7D%5Eb%20%5Cboldsymbol%7BV%7D%5E%7B%28%5Cell%29T%7D%20%5Cboldsymbol%7Bu%7D%5E%7B%28%5Cell%29%7D%20-%20%5Cdelta%5Csum_%7B%5Cell%3D1%7D%5EbV%5E%7B%28%5Cell%29T%7D%28%5Cboldsymbol%7BY%7D%20-%20%5Cboldsymbol%7BX%7D%5Cboldsymbol%7B%5Calpha%7D%20-%20%5Cboldsymbol%7Be%7D%5E%7B%28%5Cell%29%7D%29%2B%5Cdelta%5Csum_%7B%5Cell%7D%5Eb%5Cboldsymbol%7BV%7D%5E%7B%28%5Cell%29T%7D%5Cboldsymbol%7BV%7D%5E%7B%28%5Cell%29%7D%5Cboldsymbol%7B%5Ceta%5E%7B%28g%29%7D%7D%20-%20%5Cboldsymbol%7Bw%7D%20%2B%20%5Cdelta%5Cboldsymbol%7B%5Ceta%7D%5E%7B%28g%29%7D%20-%20%5Cdelta%5Cboldsymbol%7B%5Ctheta%7D%20%20%3D%200%20
-" \\frac{\\partial Q}{\\partial \\boldsymbol{\\eta}^{(g)T}} = -\\sum_{\\ell}^b \\boldsymbol{V}^{(\\ell)T} \\boldsymbol{u}^{(\\ell)} - \\delta\\sum_{\\ell=1}^bV^{(\\ell)T}(\\boldsymbol{Y} - \\boldsymbol{X}\\boldsymbol{\\alpha} - \\boldsymbol{e}^{(\\ell)})+\\delta\\sum_{\\ell}^b\\boldsymbol{V}^{(\\ell)T}\\boldsymbol{V}^{(\\ell)}\\boldsymbol{\\eta^{(g)}} - \\boldsymbol{w} + \\delta\\boldsymbol{\\eta}^{(g)} - \\delta\\boldsymbol{\\theta}  = 0 ")  
-
-Closed form for ![\\eta](https://latex.codecogs.com/png.latex?%5Ceta
-"\\eta")
+### Closed form for eta.
 
   
-![\\hat{\\boldsymbol{\\eta}}^{(g)} =
-\\frac{1}{\\delta}(\\sum\_{\\ell}^b\\boldsymbol{V}^{(\\ell)T}\\boldsymbol{V}^{(\\ell)}
-+ \\boldsymbol{I})^{-1}(\\boldsymbol{w} +
-\\delta\\boldsymbol{\\theta}+\\sum\_{\\ell}^b\\boldsymbol{V}^{(\\ell)T}\\boldsymbol{u}
-+ \\delta\\sum\_{\\ell}^b\\boldsymbol{V}^{(\\ell)T}(\\boldsymbol{Y} -
-\\boldsymbol{X}\\boldsymbol{\\alpha} -
-\\boldsymbol{e}))](https://latex.codecogs.com/png.latex?%5Chat%7B%5Cboldsymbol%7B%5Ceta%7D%7D%5E%7B%28g%29%7D%20%3D%20%5Cfrac%7B1%7D%7B%5Cdelta%7D%28%5Csum_%7B%5Cell%7D%5Eb%5Cboldsymbol%7BV%7D%5E%7B%28%5Cell%29T%7D%5Cboldsymbol%7BV%7D%5E%7B%28%5Cell%29%7D%20%2B%20%5Cboldsymbol%7BI%7D%29%5E%7B-1%7D%28%5Cboldsymbol%7Bw%7D%20%2B%20%5Cdelta%5Cboldsymbol%7B%5Ctheta%7D%2B%5Csum_%7B%5Cell%7D%5Eb%5Cboldsymbol%7BV%7D%5E%7B%28%5Cell%29T%7D%5Cboldsymbol%7Bu%7D%20%2B%20%5Cdelta%5Csum_%7B%5Cell%7D%5Eb%5Cboldsymbol%7BV%7D%5E%7B%28%5Cell%29T%7D%28%5Cboldsymbol%7BY%7D%20-%20%5Cboldsymbol%7BX%7D%5Cboldsymbol%7B%5Calpha%7D%20-%20%5Cboldsymbol%7Be%7D%29%29
-"\\hat{\\boldsymbol{\\eta}}^{(g)} = \\frac{1}{\\delta}(\\sum_{\\ell}^b\\boldsymbol{V}^{(\\ell)T}\\boldsymbol{V}^{(\\ell)} + \\boldsymbol{I})^{-1}(\\boldsymbol{w} + \\delta\\boldsymbol{\\theta}+\\sum_{\\ell}^b\\boldsymbol{V}^{(\\ell)T}\\boldsymbol{u} + \\delta\\sum_{\\ell}^b\\boldsymbol{V}^{(\\ell)T}(\\boldsymbol{Y} - \\boldsymbol{X}\\boldsymbol{\\alpha} - \\boldsymbol{e}))")  
+![\\begin{aligned}\\frac{\\partial
+Q}{\\partial\\boldsymbol{\\eta}^{(g)T}}&=-\\sum\_{\\ell}^b
+\\boldsymbol{V}^{(\\ell)T}\\boldsymbol{u}^{(\\ell)}-\\delta\\sum\_{\\ell=1}^bV^{(\\ell)T}(\\boldsymbol{Y}-\\boldsymbol{X}\\boldsymbol{\\alpha}-\\boldsymbol{e}^{(\\ell)})+\\delta\\sum\_{\\ell}^b\\boldsymbol{V}^{(\\ell)T}\\boldsymbol{V}^{(\\ell)}\\boldsymbol{\\eta^{(g)}}-\\boldsymbol{w}+\\delta\\boldsymbol{\\eta}^{(g)}-\\delta\\boldsymbol{\\theta}\\\\&=0\\\\\\hat{\\boldsymbol{\\eta}}^{(g)}&=\\frac{1}{\\delta}(\\sum\_{\\ell}^b\\boldsymbol{V}^{(\\ell)T}\\boldsymbol{V}^{(\\ell)}+\\boldsymbol{I})^{-1}(\\boldsymbol{w}+\\delta\\boldsymbol{\\theta}+\\sum\_{\\ell}^b\\boldsymbol{V}^{(\\ell)T}\\boldsymbol{u}+\\delta\\sum\_{\\ell}^b\\boldsymbol{V}^{(\\ell)T}(\\boldsymbol{Y}-\\boldsymbol{X}\\boldsymbol{\\alpha}-\\boldsymbol{e}))\\end{aligned}](https://latex.codecogs.com/png.latex?%5Cbegin%7Baligned%7D%5Cfrac%7B%5Cpartial%20Q%7D%7B%5Cpartial%5Cboldsymbol%7B%5Ceta%7D%5E%7B%28g%29T%7D%7D%26%3D-%5Csum_%7B%5Cell%7D%5Eb%20%5Cboldsymbol%7BV%7D%5E%7B%28%5Cell%29T%7D%5Cboldsymbol%7Bu%7D%5E%7B%28%5Cell%29%7D-%5Cdelta%5Csum_%7B%5Cell%3D1%7D%5EbV%5E%7B%28%5Cell%29T%7D%28%5Cboldsymbol%7BY%7D-%5Cboldsymbol%7BX%7D%5Cboldsymbol%7B%5Calpha%7D-%5Cboldsymbol%7Be%7D%5E%7B%28%5Cell%29%7D%29%2B%5Cdelta%5Csum_%7B%5Cell%7D%5Eb%5Cboldsymbol%7BV%7D%5E%7B%28%5Cell%29T%7D%5Cboldsymbol%7BV%7D%5E%7B%28%5Cell%29%7D%5Cboldsymbol%7B%5Ceta%5E%7B%28g%29%7D%7D-%5Cboldsymbol%7Bw%7D%2B%5Cdelta%5Cboldsymbol%7B%5Ceta%7D%5E%7B%28g%29%7D-%5Cdelta%5Cboldsymbol%7B%5Ctheta%7D%5C%5C%26%3D0%5C%5C%5Chat%7B%5Cboldsymbol%7B%5Ceta%7D%7D%5E%7B%28g%29%7D%26%3D%5Cfrac%7B1%7D%7B%5Cdelta%7D%28%5Csum_%7B%5Cell%7D%5Eb%5Cboldsymbol%7BV%7D%5E%7B%28%5Cell%29T%7D%5Cboldsymbol%7BV%7D%5E%7B%28%5Cell%29%7D%2B%5Cboldsymbol%7BI%7D%29%5E%7B-1%7D%28%5Cboldsymbol%7Bw%7D%2B%5Cdelta%5Cboldsymbol%7B%5Ctheta%7D%2B%5Csum_%7B%5Cell%7D%5Eb%5Cboldsymbol%7BV%7D%5E%7B%28%5Cell%29T%7D%5Cboldsymbol%7Bu%7D%2B%5Cdelta%5Csum_%7B%5Cell%7D%5Eb%5Cboldsymbol%7BV%7D%5E%7B%28%5Cell%29T%7D%28%5Cboldsymbol%7BY%7D-%5Cboldsymbol%7BX%7D%5Cboldsymbol%7B%5Calpha%7D-%5Cboldsymbol%7Be%7D%29%29%5Cend%7Baligned%7D
+"\\begin{aligned}\\frac{\\partial Q}{\\partial\\boldsymbol{\\eta}^{(g)T}}&=-\\sum_{\\ell}^b \\boldsymbol{V}^{(\\ell)T}\\boldsymbol{u}^{(\\ell)}-\\delta\\sum_{\\ell=1}^bV^{(\\ell)T}(\\boldsymbol{Y}-\\boldsymbol{X}\\boldsymbol{\\alpha}-\\boldsymbol{e}^{(\\ell)})+\\delta\\sum_{\\ell}^b\\boldsymbol{V}^{(\\ell)T}\\boldsymbol{V}^{(\\ell)}\\boldsymbol{\\eta^{(g)}}-\\boldsymbol{w}+\\delta\\boldsymbol{\\eta}^{(g)}-\\delta\\boldsymbol{\\theta}\\\\&=0\\\\\\hat{\\boldsymbol{\\eta}}^{(g)}&=\\frac{1}{\\delta}(\\sum_{\\ell}^b\\boldsymbol{V}^{(\\ell)T}\\boldsymbol{V}^{(\\ell)}+\\boldsymbol{I})^{-1}(\\boldsymbol{w}+\\delta\\boldsymbol{\\theta}+\\sum_{\\ell}^b\\boldsymbol{V}^{(\\ell)T}\\boldsymbol{u}+\\delta\\sum_{\\ell}^b\\boldsymbol{V}^{(\\ell)T}(\\boldsymbol{Y}-\\boldsymbol{X}\\boldsymbol{\\alpha}-\\boldsymbol{e}))\\end{aligned}")  
 
-Closed form for ![\\eta](https://latex.codecogs.com/png.latex?%5Ceta
-"\\eta")
+### Closed form for theta
 
   
-![\\frac{\\partial Q}{\\partial \\boldsymbol{\\theta}^{(g)T}} =
-\\boldsymbol{w} + \\delta\\boldsymbol{\\theta} -
-\\delta\\boldsymbol{\\eta} + \\frac{\\partial
-\\lambda\_2||\\boldsymbol{\\theta}||\_2}{\\partial
-\\boldsymbol{\\theta}}
-= 0](https://latex.codecogs.com/png.latex?%5Cfrac%7B%5Cpartial%20Q%7D%7B%5Cpartial%20%5Cboldsymbol%7B%5Ctheta%7D%5E%7B%28g%29T%7D%7D%20%3D%20%5Cboldsymbol%7Bw%7D%20%2B%20%5Cdelta%5Cboldsymbol%7B%5Ctheta%7D%20-%20%5Cdelta%5Cboldsymbol%7B%5Ceta%7D%20%2B%20%5Cfrac%7B%5Cpartial%20%5Clambda_2%7C%7C%5Cboldsymbol%7B%5Ctheta%7D%7C%7C_2%7D%7B%5Cpartial%20%5Cboldsymbol%7B%5Ctheta%7D%7D%20%3D%200
-"\\frac{\\partial Q}{\\partial \\boldsymbol{\\theta}^{(g)T}} = \\boldsymbol{w} + \\delta\\boldsymbol{\\theta} - \\delta\\boldsymbol{\\eta} + \\frac{\\partial \\lambda_2||\\boldsymbol{\\theta}||_2}{\\partial \\boldsymbol{\\theta}} = 0")  
+![\\begin{aligned}\\frac{\\partial Q}{\\partial
+\\boldsymbol{\\theta}^{(g)T}}&=\\boldsymbol{w}+\\delta\\boldsymbol{\\theta}-\\delta\\boldsymbol{\\eta}+\\frac{\\partial
+\\lambda\_2||\\boldsymbol{\\theta}||\_2}{\\partial\\boldsymbol{\\theta}}\\\\&=\\boldsymbol{w}+\\delta\\boldsymbol{\\theta}-\\delta\\boldsymbol{\\eta}+\\lambda\_2\\frac{\\boldsymbol{\\theta}}{||\\boldsymbol{\\theta}||\_2},
+\\; when\\; \\boldsymbol{\\theta}
+\\ne 0\\\\&=0\\\\\\hat{\\boldsymbol{\\theta}}&=(\\delta+\\frac{\\lambda\_2}{||\\boldsymbol{\\theta}||\_2})^{-1}(\\delta\\boldsymbol{\\eta}-\\boldsymbol{w})\\end{aligned}](https://latex.codecogs.com/png.latex?%5Cbegin%7Baligned%7D%5Cfrac%7B%5Cpartial%20Q%7D%7B%5Cpartial%20%5Cboldsymbol%7B%5Ctheta%7D%5E%7B%28g%29T%7D%7D%26%3D%5Cboldsymbol%7Bw%7D%2B%5Cdelta%5Cboldsymbol%7B%5Ctheta%7D-%5Cdelta%5Cboldsymbol%7B%5Ceta%7D%2B%5Cfrac%7B%5Cpartial%20%5Clambda_2%7C%7C%5Cboldsymbol%7B%5Ctheta%7D%7C%7C_2%7D%7B%5Cpartial%5Cboldsymbol%7B%5Ctheta%7D%7D%5C%5C%26%3D%5Cboldsymbol%7Bw%7D%2B%5Cdelta%5Cboldsymbol%7B%5Ctheta%7D-%5Cdelta%5Cboldsymbol%7B%5Ceta%7D%2B%5Clambda_2%5Cfrac%7B%5Cboldsymbol%7B%5Ctheta%7D%7D%7B%7C%7C%5Cboldsymbol%7B%5Ctheta%7D%7C%7C_2%7D%2C%20%5C%3B%20when%5C%3B%20%5Cboldsymbol%7B%5Ctheta%7D%20%5Cne%200%5C%5C%26%3D0%5C%5C%5Chat%7B%5Cboldsymbol%7B%5Ctheta%7D%7D%26%3D%28%5Cdelta%2B%5Cfrac%7B%5Clambda_2%7D%7B%7C%7C%5Cboldsymbol%7B%5Ctheta%7D%7C%7C_2%7D%29%5E%7B-1%7D%28%5Cdelta%5Cboldsymbol%7B%5Ceta%7D-%5Cboldsymbol%7Bw%7D%29%5Cend%7Baligned%7D
+"\\begin{aligned}\\frac{\\partial Q}{\\partial \\boldsymbol{\\theta}^{(g)T}}&=\\boldsymbol{w}+\\delta\\boldsymbol{\\theta}-\\delta\\boldsymbol{\\eta}+\\frac{\\partial \\lambda_2||\\boldsymbol{\\theta}||_2}{\\partial\\boldsymbol{\\theta}}\\\\&=\\boldsymbol{w}+\\delta\\boldsymbol{\\theta}-\\delta\\boldsymbol{\\eta}+\\lambda_2\\frac{\\boldsymbol{\\theta}}{||\\boldsymbol{\\theta}||_2}, \\; when\\; \\boldsymbol{\\theta} \\ne 0\\\\&=0\\\\\\hat{\\boldsymbol{\\theta}}&=(\\delta+\\frac{\\lambda_2}{||\\boldsymbol{\\theta}||_2})^{-1}(\\delta\\boldsymbol{\\eta}-\\boldsymbol{w})\\end{aligned}")  
+
 Closed form for ![\\theta](https://latex.codecogs.com/png.latex?%5Ctheta
 "\\theta") -\> penalty term 미분…?
+
+### Closed form for alpha
 
   
 ![\\begin{aligned} \\frac{\\partial Q}{\\partial \\alpha^{(g)T}} &=
