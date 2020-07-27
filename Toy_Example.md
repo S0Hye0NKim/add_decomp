@@ -11,7 +11,7 @@ library(ggplot2)
 library(splines)
 ```
 
-# Initial Setting
+# 0\. Initial Setting
 
   
 ![\\begin{aligned}Y &\\in \\mathbb{R}^{n\\times g}\\\\Y &= XB(\\tau) +
@@ -66,7 +66,7 @@ Y <- X%*%true_B_tau + eps_tau
 "B(\\tau)")는 각 열들을 기준으로 최소 1개의 non-zero entry, 하지만 특정 행에 대해서는 모두 0인 값을
 가진다.
 
-## Question
+#### Question
 
 1.  Y를 generate할 때, 사용하는
     ![B(\\tau)](https://latex.codecogs.com/png.latex?B%28%5Ctau%29
@@ -75,7 +75,9 @@ Y <- X%*%true_B_tau + eps_tau
     = 0.5](https://latex.codecogs.com/png.latex?%5Ctau%20%3D%200.5
     "\\tau = 0.5") 로 generate 시켰는데, 이렇게 하는게 맞나?
 
-# Check function
+# 1\. Preliminary
+
+### 1-1. Check function
 
 ``` r
 check_ft <- function(x, tau) {
@@ -89,7 +91,7 @@ check_ft <- function(x, tau) {
 \\mathbb{I}(x\<0))x](https://latex.codecogs.com/png.latex?%5Crho_%5Ctau%28x%29%20%3D%20%28%5Ctau%20-%20%5Cmathbb%7BI%7D%28x%3C0%29%29x
 "\\rho_\\tau(x) = (\\tau - \\mathbb{I}(x\<0))x")  
 
-# Basis function
+### 1-2. Basis function
 
 ``` r
 knot <- 10
@@ -100,7 +102,7 @@ tau_seq <- seq(from = 0.25, to = 0.75, length.out = b + 1)
 Phi <- bs(tau_seq, df = K, intercept = TRUE)
 ```
 
-## Questions
+#### Questions
 
 1.  tau seq 이렇게 설정하는게 맞나?
 2.  degree of freedom 설정
@@ -113,7 +115,7 @@ x\_{i1}\\Phi(\\tau\_\\ell)^T, \\dots, x\_{ip}\\Phi(\\tau\_\\ell)^T) \\\\
 \\mathbb{R}^{(p+1)K}\\end{aligned}](https://latex.codecogs.com/png.latex?%5Cbegin%7Baligned%7D%5Cboldsymbol%7Bv%7D_i%5E%7B%28%5Cell%29%7D%20%26%3D%20%28%5Cboldsymbol%7Bx%7D_i%20%5Cotimes%20%5CPhi%28%5Ctau_%7B%5Cell%7D%29%29%5ET%5C%5C%20%26%3D%28%5CPhi%28%5Ctau_%5Cell%29%5ET%2C%20x_%7Bi1%7D%5CPhi%28%5Ctau_%5Cell%29%5ET%2C%20%5Cdots%2C%20x_%7Bip%7D%5CPhi%28%5Ctau_%5Cell%29%5ET%29%20%5C%5C%20%26%5Cin%20%5Cmathbb%7BR%7D%5E%7B%28p%2B1%29K%7D%5Cend%7Baligned%7D
 "\\begin{aligned}\\boldsymbol{v}_i^{(\\ell)} &= (\\boldsymbol{x}_i \\otimes \\Phi(\\tau_{\\ell}))^T\\\\ &=(\\Phi(\\tau_\\ell)^T, x_{i1}\\Phi(\\tau_\\ell)^T, \\dots, x_{ip}\\Phi(\\tau_\\ell)^T) \\\\ &\\in \\mathbb{R}^{(p+1)K}\\end{aligned}")  
 
-# New design matrix for regional quantile
+### 1-3. New design matrix for regional quantile
 
 ``` r
 V <- list()
@@ -138,7 +140,7 @@ for(l in 1:b){
 (p+1)K}](https://latex.codecogs.com/png.latex?%5Cboldsymbol%7BV%7D%5E%7B%28%5Cell%29%7D%20%3D%20%5Cbegin%7Bbmatrix%7D%20v_1%5E%7B%28%5Cell%29%7D%20%5C%5Cv_2%5E%7B%28%5Cell%29%7D%20%5C%5C%20%5Cvdots%20%5C%5C%20v_n%5E%7B%28%5Cell%29%7D%5Cend%7Bbmatrix%7D%20%5Cin%20%5Cmathbb%7BR%7D%5E%7Bn%5Ctimes%20%28p%2B1%29K%7D
 "\\boldsymbol{V}^{(\\ell)} = \\begin{bmatrix} v_1^{(\\ell)} \\\\v_2^{(\\ell)} \\\\ \\vdots \\\\ v_n^{(\\ell)}\\end{bmatrix} \\in \\mathbb{R}^{n\\times (p+1)K}")  
 
-# Initial value for estimator
+### 1-4. Initial value for estimator
 
   
 ![\\boldsymbol{\\eta}^{(g)}, \\boldsymbol{\\theta}^{(g)},
@@ -163,7 +165,7 @@ u_init <- matrix(1, nrow = n, ncol = 1)
 w_init <- matrix(1, nrow = (p+1)*K, ncol = 1)
 ```
 
-## Question
+#### Question
 
 1.  dual problem 전개할 때, ![\\theta\_0 = \\eta\_0, \\;e\_0 =
     Y-X\\alpha=V-\\eta](https://latex.codecogs.com/png.latex?%5Ctheta_0%20%3D%20%5Ceta_0%2C%20%5C%3Be_0%20%3D%20Y-X%5Calpha%3DV-%5Ceta
@@ -174,9 +176,9 @@ w_init <- matrix(1, nrow = (p+1)*K, ncol = 1)
 2.  Objective function이 convex한지? convex 안하면 초기값에 따라 local에 빠질 수도…
     global을 찾자\!
 
-# closed form
+# 2\. closed form
 
-### Closed form for eta.
+### 2-1. Closed form for eta.
 
   
 ![\\begin{aligned}\\frac{\\partial
@@ -184,7 +186,16 @@ Q}{\\partial\\boldsymbol{\\eta}^{(g)T}}&=-\\sum\_{\\ell}^b
 \\boldsymbol{V}^{(\\ell)T}\\boldsymbol{u}^{(\\ell)}-\\delta\\sum\_{\\ell=1}^bV^{(\\ell)T}(\\boldsymbol{Y}-\\boldsymbol{X}\\boldsymbol{\\alpha}-\\boldsymbol{e}^{(\\ell)})+\\delta\\sum\_{\\ell}^b\\boldsymbol{V}^{(\\ell)T}\\boldsymbol{V}^{(\\ell)}\\boldsymbol{\\eta^{(g)}}-\\boldsymbol{w}+\\delta\\boldsymbol{\\eta}^{(g)}-\\delta\\boldsymbol{\\theta}\\\\&=0\\\\\\hat{\\boldsymbol{\\eta}}^{(g)}&=\\frac{1}{\\delta}(\\sum\_{\\ell}^b\\boldsymbol{V}^{(\\ell)T}\\boldsymbol{V}^{(\\ell)}+\\boldsymbol{I})^{-1}(\\boldsymbol{w}+\\delta\\boldsymbol{\\theta}+\\sum\_{\\ell}^b\\boldsymbol{V}^{(\\ell)T}\\boldsymbol{u}+\\delta\\sum\_{\\ell}^b\\boldsymbol{V}^{(\\ell)T}(\\boldsymbol{Y}-\\boldsymbol{X}\\boldsymbol{\\alpha}-\\boldsymbol{e}))\\end{aligned}](https://latex.codecogs.com/png.latex?%5Cbegin%7Baligned%7D%5Cfrac%7B%5Cpartial%20Q%7D%7B%5Cpartial%5Cboldsymbol%7B%5Ceta%7D%5E%7B%28g%29T%7D%7D%26%3D-%5Csum_%7B%5Cell%7D%5Eb%20%5Cboldsymbol%7BV%7D%5E%7B%28%5Cell%29T%7D%5Cboldsymbol%7Bu%7D%5E%7B%28%5Cell%29%7D-%5Cdelta%5Csum_%7B%5Cell%3D1%7D%5EbV%5E%7B%28%5Cell%29T%7D%28%5Cboldsymbol%7BY%7D-%5Cboldsymbol%7BX%7D%5Cboldsymbol%7B%5Calpha%7D-%5Cboldsymbol%7Be%7D%5E%7B%28%5Cell%29%7D%29%2B%5Cdelta%5Csum_%7B%5Cell%7D%5Eb%5Cboldsymbol%7BV%7D%5E%7B%28%5Cell%29T%7D%5Cboldsymbol%7BV%7D%5E%7B%28%5Cell%29%7D%5Cboldsymbol%7B%5Ceta%5E%7B%28g%29%7D%7D-%5Cboldsymbol%7Bw%7D%2B%5Cdelta%5Cboldsymbol%7B%5Ceta%7D%5E%7B%28g%29%7D-%5Cdelta%5Cboldsymbol%7B%5Ctheta%7D%5C%5C%26%3D0%5C%5C%5Chat%7B%5Cboldsymbol%7B%5Ceta%7D%7D%5E%7B%28g%29%7D%26%3D%5Cfrac%7B1%7D%7B%5Cdelta%7D%28%5Csum_%7B%5Cell%7D%5Eb%5Cboldsymbol%7BV%7D%5E%7B%28%5Cell%29T%7D%5Cboldsymbol%7BV%7D%5E%7B%28%5Cell%29%7D%2B%5Cboldsymbol%7BI%7D%29%5E%7B-1%7D%28%5Cboldsymbol%7Bw%7D%2B%5Cdelta%5Cboldsymbol%7B%5Ctheta%7D%2B%5Csum_%7B%5Cell%7D%5Eb%5Cboldsymbol%7BV%7D%5E%7B%28%5Cell%29T%7D%5Cboldsymbol%7Bu%7D%2B%5Cdelta%5Csum_%7B%5Cell%7D%5Eb%5Cboldsymbol%7BV%7D%5E%7B%28%5Cell%29T%7D%28%5Cboldsymbol%7BY%7D-%5Cboldsymbol%7BX%7D%5Cboldsymbol%7B%5Calpha%7D-%5Cboldsymbol%7Be%7D%29%29%5Cend%7Baligned%7D
 "\\begin{aligned}\\frac{\\partial Q}{\\partial\\boldsymbol{\\eta}^{(g)T}}&=-\\sum_{\\ell}^b \\boldsymbol{V}^{(\\ell)T}\\boldsymbol{u}^{(\\ell)}-\\delta\\sum_{\\ell=1}^bV^{(\\ell)T}(\\boldsymbol{Y}-\\boldsymbol{X}\\boldsymbol{\\alpha}-\\boldsymbol{e}^{(\\ell)})+\\delta\\sum_{\\ell}^b\\boldsymbol{V}^{(\\ell)T}\\boldsymbol{V}^{(\\ell)}\\boldsymbol{\\eta^{(g)}}-\\boldsymbol{w}+\\delta\\boldsymbol{\\eta}^{(g)}-\\delta\\boldsymbol{\\theta}\\\\&=0\\\\\\hat{\\boldsymbol{\\eta}}^{(g)}&=\\frac{1}{\\delta}(\\sum_{\\ell}^b\\boldsymbol{V}^{(\\ell)T}\\boldsymbol{V}^{(\\ell)}+\\boldsymbol{I})^{-1}(\\boldsymbol{w}+\\delta\\boldsymbol{\\theta}+\\sum_{\\ell}^b\\boldsymbol{V}^{(\\ell)T}\\boldsymbol{u}+\\delta\\sum_{\\ell}^b\\boldsymbol{V}^{(\\ell)T}(\\boldsymbol{Y}-\\boldsymbol{X}\\boldsymbol{\\alpha}-\\boldsymbol{e}))\\end{aligned}")  
 
-### Closed form for theta
+  
+![\\frac{\\partial^2
+Q}{\\partial\\boldsymbol{\\eta}^2}=\\delta\\sum\_{\\ell}^b\\boldsymbol{V}^{(\\ell)T}\\boldsymbol{V}^{(\\ell)}+\\delta\\boldsymbol{I}\\succeq0](https://latex.codecogs.com/png.latex?%5Cfrac%7B%5Cpartial%5E2%20Q%7D%7B%5Cpartial%5Cboldsymbol%7B%5Ceta%7D%5E2%7D%3D%5Cdelta%5Csum_%7B%5Cell%7D%5Eb%5Cboldsymbol%7BV%7D%5E%7B%28%5Cell%29T%7D%5Cboldsymbol%7BV%7D%5E%7B%28%5Cell%29%7D%2B%5Cdelta%5Cboldsymbol%7BI%7D%5Csucceq0
+"\\frac{\\partial^2 Q}{\\partial\\boldsymbol{\\eta}^2}=\\delta\\sum_{\\ell}^b\\boldsymbol{V}^{(\\ell)T}\\boldsymbol{V}^{(\\ell)}+\\delta\\boldsymbol{I}\\succeq0")  
+
+2차 미분한 값이 semi-positive definite이기 때문에 1차 미분 = 0인
+![\\boldsymbol{\\eta}](https://latex.codecogs.com/png.latex?%5Cboldsymbol%7B%5Ceta%7D
+"\\boldsymbol{\\eta}")가 minimum이 된다.
+
+### 2-2. Closed form for theta
 
   
 ![\\begin{aligned}\\frac{\\partial Q}{\\partial
@@ -197,7 +208,13 @@ Q}{\\partial\\boldsymbol{\\eta}^{(g)T}}&=-\\sum\_{\\ell}^b
 Closed form for ![\\theta](https://latex.codecogs.com/png.latex?%5Ctheta
 "\\theta") -\> penalty term 미분…?
 
-### Closed form for alpha
+#### Question
+
+1.  l2 norm? Ridge처럼…? 하면 explicit solution 나올텐데…
+2.  theta hat을 정의하는데 theta l2 norm이 들어가 있다…?
+3.  미분해서 0이 되는 값이 minimum이라는 보장
+
+### 2-3. Closed form for alpha
 
   
 ![\\begin{aligned} \\frac{\\partial Q}{\\partial \\alpha^{(g)T}} &=
@@ -214,7 +231,13 @@ Closed form for ![\\theta](https://latex.codecogs.com/png.latex?%5Ctheta
 Closed form for ![\\alpha](https://latex.codecogs.com/png.latex?%5Calpha
 "\\alpha") -\> penalty term 미분…?
 
-## Questions
+#### Questions
 
 1.  Penalty term 미분 어떻게??
 2.  check function 미분 어떻게??
+
+### 2-4. Closed form for multipliers
+
+  
+![\\begin{aligned}\\boldsymbol{u}^{(\\ell)(g)^{k+1}}:=&\\boldsymbol{u}^{(\\ell)(g)^k}+\\delta(\\boldsymbol{Y}^{(g)}-\\boldsymbol{X}\\boldsymbol{\\alpha}^{(g)^{k+1}}-\\boldsymbol{V}^{(\\ell)}\\boldsymbol{\\eta}^{(g)^{k+1}}-\\boldsymbol{e}^{(\\ell)(g)^{k+1}})\\\\\\boldsymbol{w}^{(g)^{k+1}}:=&\\boldsymbol{w}^{(g)^{k}}+\\delta(\\boldsymbol{\\theta}^{(g)^{k+1}}-\\boldsymbol{\\eta}^{(g)^{k+1}})\\end{aligned}](https://latex.codecogs.com/png.latex?%5Cbegin%7Baligned%7D%5Cboldsymbol%7Bu%7D%5E%7B%28%5Cell%29%28g%29%5E%7Bk%2B1%7D%7D%3A%3D%26%5Cboldsymbol%7Bu%7D%5E%7B%28%5Cell%29%28g%29%5Ek%7D%2B%5Cdelta%28%5Cboldsymbol%7BY%7D%5E%7B%28g%29%7D-%5Cboldsymbol%7BX%7D%5Cboldsymbol%7B%5Calpha%7D%5E%7B%28g%29%5E%7Bk%2B1%7D%7D-%5Cboldsymbol%7BV%7D%5E%7B%28%5Cell%29%7D%5Cboldsymbol%7B%5Ceta%7D%5E%7B%28g%29%5E%7Bk%2B1%7D%7D-%5Cboldsymbol%7Be%7D%5E%7B%28%5Cell%29%28g%29%5E%7Bk%2B1%7D%7D%29%5C%5C%5Cboldsymbol%7Bw%7D%5E%7B%28g%29%5E%7Bk%2B1%7D%7D%3A%3D%26%5Cboldsymbol%7Bw%7D%5E%7B%28g%29%5E%7Bk%7D%7D%2B%5Cdelta%28%5Cboldsymbol%7B%5Ctheta%7D%5E%7B%28g%29%5E%7Bk%2B1%7D%7D-%5Cboldsymbol%7B%5Ceta%7D%5E%7B%28g%29%5E%7Bk%2B1%7D%7D%29%5Cend%7Baligned%7D
+"\\begin{aligned}\\boldsymbol{u}^{(\\ell)(g)^{k+1}}:=&\\boldsymbol{u}^{(\\ell)(g)^k}+\\delta(\\boldsymbol{Y}^{(g)}-\\boldsymbol{X}\\boldsymbol{\\alpha}^{(g)^{k+1}}-\\boldsymbol{V}^{(\\ell)}\\boldsymbol{\\eta}^{(g)^{k+1}}-\\boldsymbol{e}^{(\\ell)(g)^{k+1}})\\\\\\boldsymbol{w}^{(g)^{k+1}}:=&\\boldsymbol{w}^{(g)^{k}}+\\delta(\\boldsymbol{\\theta}^{(g)^{k+1}}-\\boldsymbol{\\eta}^{(g)^{k+1}})\\end{aligned}")
