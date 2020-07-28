@@ -129,55 +129,10 @@ w_init <- matrix(1, nrow = (p+1)*K, ncol = 1)
 ```
 
 
-#### Question
+####     Question
   1. dual problem 전개할 때, $\theta_0 = \eta_0, \;e_0 = Y-X\alpha=V-\eta$ ??? 초기값 설정 어떻게?
     -> 우선 $\theta, \eta$는 각각 설정하고, e는 equality condition과 동일하게 설정.
   2. Objective function이 convex한지? convex 안하면 초기값에 따라 local에 빠질 수도... global을 찾자!
-
-
-# 2. closed form
-
-### 2-1. Closed form for eta.
-
-$$\begin{aligned}\frac{\partial Q}{\partial\boldsymbol{\eta}^{(g)T}}&=-\sum_{\ell}^b \boldsymbol{V}^{(\ell)T}\boldsymbol{u}^{(\ell)}-\delta\sum_{\ell=1}^bV^{(\ell)T}(\boldsymbol{Y}-\boldsymbol{X}\boldsymbol{\alpha}-\boldsymbol{e}^{(\ell)})+\delta\sum_{\ell}^b\boldsymbol{V}^{(\ell)T}\boldsymbol{V}^{(\ell)}\boldsymbol{\eta^{(g)}}-\boldsymbol{w}+\delta\boldsymbol{\eta}^{(g)}-\delta\boldsymbol{\theta}\\&=0\\\hat{\boldsymbol{\eta}}^{(g)}&=\frac{1}{\delta}(\sum_{\ell}^b\boldsymbol{V}^{(\ell)T}\boldsymbol{V}^{(\ell)}+\boldsymbol{I})^{-1}(\boldsymbol{w}+\delta\boldsymbol{\theta}+\sum_{\ell}^b\boldsymbol{V}^{(\ell)T}\boldsymbol{u}+\delta\sum_{\ell}^b\boldsymbol{V}^{(\ell)T}(\boldsymbol{Y}-\boldsymbol{X}\boldsymbol{\alpha}-\boldsymbol{e}))\end{aligned}$$
-
-
-$$\frac{\partial^2 Q}{\partial\boldsymbol{\eta}^2}=\delta\sum_{\ell}^b\boldsymbol{V}^{(\ell)T}\boldsymbol{V}^{(\ell)}+\delta\boldsymbol{I}\succeq0$$
-
-2차 미분한 값이 semi-positive definite이기 때문에 1차 미분 = 0인 $\boldsymbol{\eta}$가 minimum이 된다. 
-
-### 2-2. Closed form for theta
-
-$$\begin{aligned}\frac{\partial Q}{\partial \boldsymbol{\theta}^{(g)T}}&=\boldsymbol{w}+\delta\boldsymbol{\theta}-\delta\boldsymbol{\eta}+\frac{\partial \lambda_2||\boldsymbol{\theta}||_2}{\partial\boldsymbol{\theta}}\\&=\boldsymbol{w}+\delta\boldsymbol{\theta}-\delta\boldsymbol{\eta}+\lambda_2\frac{\boldsymbol{\theta}}{||\boldsymbol{\theta}||_2}, \; when\; \boldsymbol{\theta} \ne 0\\&=0\\\hat{\boldsymbol{\theta}}&=(\delta+\frac{\lambda_2}{||\boldsymbol{\theta}||_2})^{-1}(\delta\boldsymbol{\eta}-\boldsymbol{w})\end{aligned}$$
-
-Closed form for $\theta$
--> penalty term 미분...?
-
-#### Question
-  1. l2 norm? Ridge처럼...? 하면 explicit solution 나올텐데...
-  2. theta hat을 정의하는데 theta l2 norm이 들어가 있다...?
-  3. 미분해서 0이 되는 값이 minimum이라는 보장
-
-
-
-### 2-3. Closed form for alpha
-
-$$\begin{aligned} \frac{\partial Q}{\partial \alpha^{(g)T}} &= -\sum_{\ell}^b\boldsymbol{X}\boldsymbol{u}^{(\ell)} -\delta\boldsymbol{X}^T\sum_{\ell}^b(\boldsymbol{Y} - \boldsymbol{V}^{(\ell)}\boldsymbol{\eta} - \boldsymbol{e}^{(\ell)}) + \delta\boldsymbol{X}^T\boldsymbol{X}\boldsymbol{\alpha} + \frac{\partial \lambda_1||\boldsymbol{A}||_*}{\partial \boldsymbol{\alpha}} \\ &= 0\end{aligned}$$
-
-
-Closed form for $\alpha$
--> penalty term 미분...?
-
-#### Questions
-  1. Penalty term 미분 어떻게??
-  2. check function 미분 어떻게??
-
-
-
-### 2-4. Closed form for multipliers
-
-$$\begin{aligned}\boldsymbol{u}^{(\ell)(g)^{k+1}}:=&\boldsymbol{u}^{(\ell)(g)^k}+\delta(\boldsymbol{Y}^{(g)}-\boldsymbol{X}\boldsymbol{\alpha}^{(g)^{k+1}}-\boldsymbol{V}^{(\ell)}\boldsymbol{\eta}^{(g)^{k+1}}-\boldsymbol{e}^{(\ell)(g)^{k+1}})\\\boldsymbol{w}^{(g)^{k+1}}:=&\boldsymbol{w}^{(g)^{k}}+\delta(\boldsymbol{\theta}^{(g)^{k+1}}-\boldsymbol{\eta}^{(g)^{k+1}})\end{aligned}$$
-
 
 
 
