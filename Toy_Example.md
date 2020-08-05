@@ -98,7 +98,7 @@ knot <- 10
 degree <- 3
 K <- knot + degree + 1 # the number of basis function
 
-tau_seq <- seq(from = 0.25, to = 0.75, length.out = b + 1) 
+tau_seq <- seq(from = 0.25, to = 0.75, length.out = b) 
 Phi <- bs(tau_seq, df = K, intercept = TRUE)
 ```
 
@@ -156,22 +156,91 @@ for(l in 1:b){
 "\\boldsymbol{\\eta}^{(g)}, \\boldsymbol{\\theta}^{(g)}, \\boldsymbol{w}^{(g)}\\in \\mathbb{R}^{(p+1)\\times K}\\\\ \\boldsymbol{\\alpha}^{(g)} \\in \\mathbb{R}^{p+1} \\\\ \\boldsymbol{e}^{(\\ell)(g)}, \\boldsymbol{u}^{(\\ell)(g)}, \\in \\mathbb{R}^{n}\\\\subject\\; to \\; \\boldsymbol{\\eta}^{(g)} - \\boldsymbol{\\theta}^{(g)} = 0, \\; and \\;\\boldsymbol{Y}^{(g)} - \\boldsymbol{X}\\boldsymbol{\\alpha}^{(g)} - \\boldsymbol{V}^{(\\ell)}\\boldsymbol{\\eta}^{(g)} - \\boldsymbol{e}^{(\\ell)(g)} = 0")  
 
 ``` r
-eta_init <- matrix(rpois(m*(p+1)*K, lambda = 5), nrow = (p+1)*K, ncol = m) # theta와 동일하게?
-theta_init <- matrix(rpois(m*(p+1)*K, lambda = 3), nrow = (p+1)*K, ncol = m) # Quant reg값?
-alpha_init <- matrix(1, nrow = p+1, ncol = m)
-e_init <- list()
-for(l in 1:b) {e_init[[l]] <- Y - X %*% alpha_init - V[[l]] %*% eta_init}
-u_init <- matrix(1, nrow = n, ncol = 1)
-w_init <- matrix(1, nrow = (p+1)*K, ncol = 1)
+eta_old <- matrix(rpois(m*(p+1)*K, lambda = 5), nrow = (p+1)*K, ncol = m) 
+theta_old <- matrix(rpois(m*(p+1)*K, lambda = 3), nrow = (p+1)*K, ncol = m) 
+alpha_old <- matrix(1, nrow = p+1, ncol = m)
+e_old <- list()
+for(l in 1:b) {e_old[[l]] <- Y - X %*% alpha_old - V[[l]] %*% eta_old}
+u_old <- list()
+for(l in 1:b) {u_old[[l]] <- matrix(1, nrow = n, ncol = m)}
+w_old <- matrix(1, nrow = (p+1)*K, ncol = m)
 ```
 
-#### Question
+# 2\. Algorithm
 
-1.  dual problem 전개할 때, ![\\theta\_0 = \\eta\_0, \\;e\_0 =
-    Y-X\\alpha=V-\\eta](https://latex.codecogs.com/png.latex?%5Ctheta_0%20%3D%20%5Ceta_0%2C%20%5C%3Be_0%20%3D%20Y-X%5Calpha%3DV-%5Ceta
-    "\\theta_0 = \\eta_0, \\;e_0 = Y-X\\alpha=V-\\eta") ??? 초기값 설정 어떻게?
-    -\> 우선 ![\\theta,
-    \\eta](https://latex.codecogs.com/png.latex?%5Ctheta%2C%20%5Ceta
-    "\\theta, \\eta")는 각각 설정하고, e는 equality condition과 동일하게 설정.
-2.  Objective function이 convex한지? convex 안하면 초기값에 따라 local에 빠질 수도…
-    global을 찾자\!
+``` r
+max_iter <- 50
+delta <- 0.05
+lambda_1 <- 0.5
+lambda_2 <- 0.5
+tol_error <- 0.01
+
+sum_V <- Reduce("+", V)
+VV_prod <- lapply(V, FUN = function(x) t(x) %*% x)
+sum_VV <- Reduce("+", VV_prod)
+
+for(iter in 1:max_iter){
+  # Process for eta
+  eta_new <- matrix(nrow = (p+1)*K, ncol = m)
+  for(g in 1:m) {
+    Vu_g_prod <- mapply(function(x,y) t(x) %*% y, V, lapply(u_old, FUN = function(x)x[, g]), SIMPLIFY = FALSE)
+    Ve_g_prod <- mapply(function(x,y) t(x) %*% y, V, lapply(e_old, FUN = function(x)x[, g]), SIMPLIFY = FALSE)
+    eta_new[, g] <- (solve(sum_VV+diag(1, (p+1)*K))/delta) %*% (w_old[, g] + delta * theta_old[, g] 
+                                                              + Reduce("+", Vu_g_prod)
+                                                              + delta * t(sum_V) %*% (Y[, g] - X %*% alpha_old[, g])
+                                                              - delta * Reduce("+", Ve_g_prod))
+  }
+  # Process for theta
+  theta_new <- matrix(nrow = (p+1)*K, ncol = m)
+  threshold <- lambda_2/delta
+  for (g in 1:m) {
+    value <- eta_new[, g] - w_old[, g]/delta 
+    theta_new[, g] <- case_when(value < -threshold ~ value + threshold, 
+                                abs(value) < threshold ~ 0, 
+                                value > threshold ~ value - threshold)
+  }
+  # Process for alpha
+  # It will be updated.
+  alpha_new <- matrix(nrow = p+1, ncol = m)
+  
+  # Process for e
+  e_new <- list()
+  for(l in 1:b){
+    e_new[[l]] <- matrix(nrow = n, ncol = m)
+    for(g in 1:m) {
+      common_val <- Y[, g] - X %*% alpha_new[, g] - V[[l]] %*% eta_new[, g]
+      e_new[[l]][, g] <- case_when(e_old[[l]][, g] < 0 ~ common_val - (u_old[[l]][, g] + tau_seq[[l]] -1)/delta, 
+                                   e_old[[l]][, g] == 0 ~ common_val - u_old[[l]][, g]/delta, 
+                                   e_old[[l]][, g] > 0 ~ common_val - (u_old[[l]][, g] + tau_seq[[l]])/delta)
+    }
+  }
+  
+  # Process for multiplier u
+  u_new <- list()
+  for(l in 1:b) {
+    u_new[[l]] <- matrix(nrow = n, ncol = m)
+    for(g in 1:m) {
+      u_new[[l]][, g] <- u_old[[l]][, g] + delta * (Y[, g] - X %*% alpha_new[, g] - V[[l]] %*% eta_new[, g] 
+                                                    - e_new[[l]][, g])
+    }
+  }
+  # Process for multiplier w
+  w_new <- matrix(nrow = (p+1)*K, ncol = m)
+  for(g in 1:m) {
+    w_new[, g] <- w_old[, g] + delta * (theta_new[, g] - eta_new[, g])
+  }
+  
+  #if(e1 < tol_error) {break}
+  
+  eta_old <- eta_new
+  theta_old <- theta_new
+  alpha_old <- alpha_new
+  e_old <- e_new
+  u_old <- u_new
+  w_old <- w_new
+}
+```
+
+![\\lambda\_1,
+\\lambda\_2](https://latex.codecogs.com/png.latex?%5Clambda_1%2C%20%5Clambda_2
+"\\lambda_1, \\lambda_2")는 임의로 0.5로 설정.
