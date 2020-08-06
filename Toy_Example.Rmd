@@ -209,8 +209,10 @@ for(iter in 1:max_iter){
 $\lambda_1, \lambda_2$는 임의로 0.5로 설정.
 
 
+## Question
+ * Stopping criteria
 
-
+$$\begin{aligned}&||\eta^{k+1}-\eta^{k}||_2^2+||\theta^{k+1}-\theta^k||_2^2+||\alpha^{k+1}-\alpha^k||_2^2\\&+||e^{k+1}-e^k||_2^2+||u^{k+1}-u^k||_2^2+||w^{k+1}-w^k||_2^2 \le \epsilon_{tol}\end{aligned}$$
 
 
 
