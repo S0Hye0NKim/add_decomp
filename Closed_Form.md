@@ -41,6 +41,13 @@ Q}{\\partial\\boldsymbol{\\eta}^2}=\\delta\\sum\_{\\ell}^b\\boldsymbol{V}^{(\\el
 "\\frac{\\partial||\\theta_j||_2}{\\partial\\theta_j} =\\begin{cases}\\theta_j/||\\theta_j||&\\quad \\text{if } \\theta_j \\ne 0\\\\\\{u:||u||\\le 1\\}&\\quad\\text{if } \\theta_j=0\\end{cases}")  
 
   
+![\\begin{aligned}\\frac{\\partial^2 Q}{\\partial
+\\theta\_j^{2(g)T}}&=\\underbrace{\\delta+\\begin{cases}1/||\\theta\_j||&\\quad\\text{if
+} \\theta\_j \\ne 0\\\\0&\\quad\\text{if }
+\\theta\_j=0\\end{cases}}\_{\>0}\\end{aligned}](https://latex.codecogs.com/png.latex?%5Cbegin%7Baligned%7D%5Cfrac%7B%5Cpartial%5E2%20Q%7D%7B%5Cpartial%20%5Ctheta_j%5E%7B2%28g%29T%7D%7D%26%3D%5Cunderbrace%7B%5Cdelta%2B%5Cbegin%7Bcases%7D1%2F%7C%7C%5Ctheta_j%7C%7C%26%5Cquad%5Ctext%7Bif%20%7D%20%5Ctheta_j%20%5Cne%200%5C%5C0%26%5Cquad%5Ctext%7Bif%20%7D%20%5Ctheta_j%3D0%5Cend%7Bcases%7D%7D_%7B%3E0%7D%5Cend%7Baligned%7D
+"\\begin{aligned}\\frac{\\partial^2 Q}{\\partial \\theta_j^{2(g)T}}&=\\underbrace{\\delta+\\begin{cases}1/||\\theta_j||&\\quad\\text{if } \\theta_j \\ne 0\\\\0&\\quad\\text{if } \\theta_j=0\\end{cases}}_{\>0}\\end{aligned}")  
+
+  
 ![\\theta\_j^{(g)^{k+1}}=\\begin{cases}\\eta\_j^{(g)}-w^{(g)}\_j/\\delta+\\lambda\_2/\\delta&\\quad
 \\text{if
 }\\eta\_j^{(g)}-w\_j^{(g)}/\\delta\\le-\\lambda\_2/\\delta\\\\0&\\quad\\text{if
@@ -93,6 +100,11 @@ e\_i^{(\\ell)(g)}}=-\\delta(Y\_i^{(g)}-X\_i\\alpha^{(g)}-V\_i^{(\\ell)}\\eta^{(g
 \\rho\_{\\tau\_{\\ell}}(e\_i^{(\\ell)(g)})}{\\partial
 e\_i^{(\\ell)(g)}}](https://latex.codecogs.com/png.latex?%5Cfrac%7B%5Cpartial%20Q%7D%7B%5Cpartial%20e_i%5E%7B%28%5Cell%29%28g%29%7D%7D%3D-%5Cdelta%28Y_i%5E%7B%28g%29%7D-X_i%5Calpha%5E%7B%28g%29%7D-V_i%5E%7B%28%5Cell%29%7D%5Ceta%5E%7B%28g%29%7D-e_i%5E%7B%28%5Cell%29%28g%29%7D%29-u_i%5E%7B%28%5Cell%29%28g%29%7D%2B%5Cfrac%7B%5Cpartial%20%5Crho_%7B%5Ctau_%7B%5Cell%7D%7D%28e_i%5E%7B%28%5Cell%29%28g%29%7D%29%7D%7B%5Cpartial%20e_i%5E%7B%28%5Cell%29%28g%29%7D%7D
 "\\frac{\\partial Q}{\\partial e_i^{(\\ell)(g)}}=-\\delta(Y_i^{(g)}-X_i\\alpha^{(g)}-V_i^{(\\ell)}\\eta^{(g)}-e_i^{(\\ell)(g)})-u_i^{(\\ell)(g)}+\\frac{\\partial \\rho_{\\tau_{\\ell}}(e_i^{(\\ell)(g)})}{\\partial e_i^{(\\ell)(g)}}")  
+
+  
+![\\frac{\\partial^2 Q}{\\partial
+e\_i^{2(\\ell)(g)}}=\\delta\>0](https://latex.codecogs.com/png.latex?%5Cfrac%7B%5Cpartial%5E2%20Q%7D%7B%5Cpartial%20e_i%5E%7B2%28%5Cell%29%28g%29%7D%7D%3D%5Cdelta%3E0
+"\\frac{\\partial^2 Q}{\\partial e_i^{2(\\ell)(g)}}=\\delta\>0")  
 
   
 ![\\frac{\\partial \\rho\_{\\tau\_{\\ell}}(e\_i^{(\\ell)(g)})}{\\partial
