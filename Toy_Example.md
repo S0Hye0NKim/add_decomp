@@ -157,6 +157,7 @@ for(l in 1:b){
 eta_old <- matrix(rpois(m*(p+1)*K, lambda = 5), nrow = (p+1)*K, ncol = m) 
 theta_old <- matrix(rpois(m*(p+1)*K, lambda = 3), nrow = (p+1)*K, ncol = m) 
 alpha_old <- matrix(1, nrow = p+1, ncol = m)
+Z_old <- X %*% alpha_old
 e_old <- list()
 for(l in 1:b) {e_old[[l]] <- Y - X %*% alpha_old - V[[l]] %*% eta_old}
 u_old <- list()
@@ -174,20 +175,18 @@ lambda_2 <- 0.5
 tol_error <- 0.01
 
 sum_V <- Reduce("+", V)
-VV_prod <- lapply(V, FUN = function(x) t(x) %*% x)
+VV_prod <- lapply(V, FUN = function(x) t(x) %*% x)   # V^TV
 sum_VV <- Reduce("+", VV_prod)
 
 for(iter in 1:max_iter){
   # Process for eta
   eta_new <- matrix(nrow = (p+1)*K, ncol = m)
-  for(g in 1:m) {
-    Vu_g_prod <- mapply(function(x,y) t(x) %*% y, V, lapply(u_old, FUN = function(x)x[, g]), SIMPLIFY = FALSE)
-    Ve_g_prod <- mapply(function(x,y) t(x) %*% y, V, lapply(e_old, FUN = function(x)x[, g]), SIMPLIFY = FALSE)
-    eta_new[, g] <- (solve(sum_VV+diag(1, (p+1)*K))/delta) %*% (w_old[, g] + delta * theta_old[, g] 
-                                                              + Reduce("+", Vu_g_prod)
-                                                              + delta * t(sum_V) %*% (Y[, g] - X %*% alpha_old[, g])
-                                                              - delta * Reduce("+", Ve_g_prod))
-  }
+  Vu_prod <- mapply(function(x,y) t(x) %*% y, V, u_old, SIMPLIFY = FALSE)
+  Ve_prod <- mapply(function(x,y) t(x) %*% y, V, e_old, SIMPLIFY = FALSE)
+  eta_new <- (solve(sum_VV+diag(1, (p+1)*K))/delta) %*% (w_old + delta * theta_old + Reduce("+", Vu_prod)
+                                                         + delta * t(sum_V) %*% (Y - Z_old)
+                                                         - delta * Reduce("+", Ve_prod))
+  
   # Process for theta
   theta_new <- matrix(nrow = (p+1)*K, ncol = m)
   threshold <- lambda_2/delta
@@ -197,36 +196,35 @@ for(iter in 1:max_iter){
                                 abs(value) < threshold ~ 0, 
                                 value > threshold ~ value - threshold)
   }
-  # Process for alpha
-  # It will be updated.
-  alpha_new <- matrix(nrow = p+1, ncol = m)
+  # Process for Z=XA
+  Y_list <- list()
+  for(i in 1:l) {Y_list[[i]] <- Y}
+  VH_list <- lapply(V, FUN = function(x) x %*% eta_new)
+  obj_list <- mapply(function(Y, VH, E, U) Y - VH - E - U/delta, Y_list, VH_list, e_old, u_old, SIMPLIFY = FALSE)
+  obj <- Reduce("+", obj_list)/b 
+  SVD <- svd(obj)
+  new_singular <- sapply(SVD$d - lambda_1/(delta*b), FUN = function(x) max(x, 0))
+  Z_new <- SVD$u %*% diag(new_singular) %*% t(SVD$v)
   
   # Process for e
   e_new <- list()
   for(l in 1:b){
     e_new[[l]] <- matrix(nrow = n, ncol = m)
+    common_val <- Y - Z_new - V[[l]] %*% eta_new
     for(g in 1:m) {
-      common_val <- Y[, g] - X %*% alpha_new[, g] - V[[l]] %*% eta_new[, g]
-      e_new[[l]][, g] <- case_when(e_old[[l]][, g] < 0 ~ common_val - (u_old[[l]][, g] + tau_seq[[l]] -1)/delta, 
-                                   e_old[[l]][, g] == 0 ~ common_val - u_old[[l]][, g]/delta, 
-                                   e_old[[l]][, g] > 0 ~ common_val - (u_old[[l]][, g] + tau_seq[[l]])/delta)
+      e_new[[l]][, g] <- case_when(e_old[[l]][, g] < 0 ~ common_val[, g] - (u_old[[l]][, g] + tau_seq[[l]] -1)/delta,
+                                   e_old[[l]][, g] == 0 ~ common_val[, g] - u_old[[l]][, g]/delta, 
+                                   e_old[[l]][, g] > 0 ~ common_val[, g] - (u_old[[l]][, g] + tau_seq[[l]])/delta)
     }
   }
   
   # Process for multiplier u
   u_new <- list()
   for(l in 1:b) {
-    u_new[[l]] <- matrix(nrow = n, ncol = m)
-    for(g in 1:m) {
-      u_new[[l]][, g] <- u_old[[l]][, g] + delta * (Y[, g] - X %*% alpha_new[, g] - V[[l]] %*% eta_new[, g] 
-                                                    - e_new[[l]][, g])
-    }
+    u_new[[l]] <- u_old[[l]] + delta * (Y - Z_new - V[[l]] %*% eta_new - e_new[[l]])
   }
   # Process for multiplier w
-  w_new <- matrix(nrow = (p+1)*K, ncol = m)
-  for(g in 1:m) {
-    w_new[, g] <- w_old[, g] + delta * (theta_new[, g] - eta_new[, g])
-  }
+  w_new <- w_old + delta * (theta_new - eta_new)
   
   #if(e1 < tol_error) {break}
   
