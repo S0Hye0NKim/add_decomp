@@ -45,7 +45,7 @@ sp_mat <- rsparsematrix(nrow = p+1, ncol = m, nnz = r)             # make sparse
 LR_mat <- matrix(rnorm(m*(p+1), mean = 0, sd = 1), ncol = m)      # make low rank matrix using SVD
 SVD <- svd(LR_mat)
 D_mat <- diag(SVD$d)
-idx <- sample(1:m, m/2)
+idx <- sample(1:m, 15)
 D_mat[idx, idx] <- 0
 LR_mat <- SVD$u %*% D_mat %*% t(SVD$v)          
 
@@ -86,7 +86,7 @@ $$\rho_\tau(x) = (\tau - \mathbb{I}(x<0))x$$
 ```{r}
 K <- 15
 
-tau_seq <- seq(from = 0.25, to = 0.75, length.out = b) 
+tau_seq <- seq(from = 0.4, to = 0.6, length.out = b) 
 Phi <- bs(tau_seq, df = K, degree = 3, intercept = TRUE)
 ```
 
@@ -131,7 +131,12 @@ w_old <- matrix(1, nrow = (p+1)*K, ncol = m)
 ```
 
 
+
+
+
 # 2. Algorithm
+
+$$\begin{aligned}\boldsymbol{Y}&=\boldsymbol{XA}+\boldsymbol{X\Gamma}(\tau)\\&=\boldsymbol{Z}+\boldsymbol{V}_{\tau_\ell}\boldsymbol{\Theta}\end{aligned}$$
 
 ```{r eval = FALSE}
 max_iter <- 50
@@ -196,7 +201,7 @@ for(iter in 1:max_iter){
   
   eta_old <- eta_new
   theta_old <- theta_new
-  alpha_old <- alpha_new
+  Z_old <- Z_new
   e_old <- e_new
   u_old <- u_new
   w_old <- w_new

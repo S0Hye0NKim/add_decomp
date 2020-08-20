@@ -53,7 +53,7 @@ sp_mat <- rsparsematrix(nrow = p+1, ncol = m, nnz = r)             # make sparse
 LR_mat <- matrix(rnorm(m*(p+1), mean = 0, sd = 1), ncol = m)      # make low rank matrix using SVD
 SVD <- svd(LR_mat)
 D_mat <- diag(SVD$d)
-idx <- sample(1:m, m/2)
+idx <- sample(1:m, 15)
 D_mat[idx, idx] <- 0
 LR_mat <- SVD$u %*% D_mat %*% t(SVD$v)          
 
@@ -101,7 +101,7 @@ check_ft <- function(x, tau) {
 ``` r
 K <- 15
 
-tau_seq <- seq(from = 0.25, to = 0.75, length.out = b) 
+tau_seq <- seq(from = 0.4, to = 0.6, length.out = b) 
 Phi <- bs(tau_seq, df = K, degree = 3, intercept = TRUE)
 ```
 
@@ -167,6 +167,10 @@ w_old <- matrix(1, nrow = (p+1)*K, ncol = m)
 
 # 2\. Algorithm
 
+  
+![\\begin{aligned}\\boldsymbol{Y}&=\\boldsymbol{XA}+\\boldsymbol{X\\Gamma}(\\tau)\\\\&=\\boldsymbol{Z}+\\boldsymbol{V}\_{\\tau\_\\ell}\\boldsymbol{\\Theta}\\end{aligned}](https://latex.codecogs.com/png.latex?%5Cbegin%7Baligned%7D%5Cboldsymbol%7BY%7D%26%3D%5Cboldsymbol%7BXA%7D%2B%5Cboldsymbol%7BX%5CGamma%7D%28%5Ctau%29%5C%5C%26%3D%5Cboldsymbol%7BZ%7D%2B%5Cboldsymbol%7BV%7D_%7B%5Ctau_%5Cell%7D%5Cboldsymbol%7B%5CTheta%7D%5Cend%7Baligned%7D
+"\\begin{aligned}\\boldsymbol{Y}&=\\boldsymbol{XA}+\\boldsymbol{X\\Gamma}(\\tau)\\\\&=\\boldsymbol{Z}+\\boldsymbol{V}_{\\tau_\\ell}\\boldsymbol{\\Theta}\\end{aligned}")  
+
 ``` r
 max_iter <- 50
 delta <- 0.05
@@ -230,7 +234,7 @@ for(iter in 1:max_iter){
   
   eta_old <- eta_new
   theta_old <- theta_new
-  alpha_old <- alpha_new
+  Z_old <- Z_new
   e_old <- e_new
   u_old <- u_new
   w_old <- w_new
