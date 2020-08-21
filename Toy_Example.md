@@ -60,10 +60,6 @@ LR_mat <- SVD$u %*% D_mat %*% t(SVD$v)
 true_B <- sp_mat + LR_mat            # B(tau) = sparse matrix + low rank matrix
 
 eps <- matrix(rnorm(n*m, mean = 0, sd = 0.1), nrow = n)
-#tau <- 0.5
-#true_B_tau <- true_B
-#true_B_tau[1, ] <- true_B[1, ] + qnorm(tau, mean = 0, sd = 0.1)
-#eps_tau <- eps - qnorm(tau, mean = 0, sd = 0.1)
 
 Y <- X%*%true_B + eps
 ```
@@ -155,11 +151,12 @@ for(l in 1:b){
 
 ``` r
 eta_old <- matrix(rpois(m*(p+1)*K, lambda = 5), nrow = (p+1)*K, ncol = m) 
-theta_old <- matrix(rpois(m*(p+1)*K, lambda = 3), nrow = (p+1)*K, ncol = m) 
+theta_old <- eta_old
+#theta_old <- matrix(rpois(m*(p+1)*K, lambda = 3), nrow = (p+1)*K, ncol = m) 
 alpha_old <- matrix(1, nrow = p+1, ncol = m)
 Z_old <- X %*% alpha_old
 e_old <- list()
-for(l in 1:b) {e_old[[l]] <- Y - X %*% alpha_old - V[[l]] %*% eta_old}
+for(l in 1:b) {e_old[[l]] <- Y - Z_old - V[[l]] %*% eta_old}
 u_old <- list()
 for(l in 1:b) {u_old[[l]] <- matrix(1, nrow = n, ncol = m)}
 w_old <- matrix(1, nrow = (p+1)*K, ncol = m)
@@ -173,10 +170,12 @@ w_old <- matrix(1, nrow = (p+1)*K, ncol = m)
 
 ``` r
 max_iter <- 50
-delta <- 0.05
-lambda_1 <- 0.5
-lambda_2 <- 0.5
+delta <- 3
+lambda_1 <- 50
+lambda_2 <- 50
 tol_error <- 0.01
+iter_error <- matrix(ncol = 6, nrow = max_iter) %>%
+  `colnames<-`(value = c("eta", "theta", "alpha", "e", "u", "w"))
 
 sum_V <- Reduce("+", V)
 VV_prod <- lapply(V, FUN = function(x) t(x) %*% x)   # V^TV
@@ -197,7 +196,7 @@ for(iter in 1:max_iter){
   for (g in 1:m) {
     value <- eta_new[, g] - w_old[, g]/delta 
     theta_new[, g] <- case_when(value < -threshold ~ value + threshold, 
-                                abs(value) < threshold ~ 0, 
+                                abs(value) <= threshold ~ 0, 
                                 value > threshold ~ value - threshold)
   }
   # Process for Z=XA
@@ -209,6 +208,7 @@ for(iter in 1:max_iter){
   SVD <- svd(obj)
   new_singular <- sapply(SVD$d - lambda_1/(delta*b), FUN = function(x) max(x, 0))
   Z_new <- SVD$u %*% diag(new_singular) %*% t(SVD$v)
+  alpha_new <- solve(t(X) %*% X) %*% t(X) %*% Z_new
   
   # Process for e
   e_new <- list()
@@ -230,20 +230,39 @@ for(iter in 1:max_iter){
   # Process for multiplier w
   w_new <- w_old + delta * (theta_new - eta_new)
   
-  #if(e1 < tol_error) {break}
+  # Update iteration error
+  iter_error[iter, "eta"] <- Matrix::norm(eta_old - eta_new, type = "F")
+  iter_error[iter, "theta"] <- Matrix::norm(theta_old - theta_new, type = "F")
+  iter_error[iter, "alpha"] <- Matrix::norm(alpha_old - alpha_new, type = "F")
+  e_diff <- mapply(FUN = function(old, new) old - new, e_old, e_new, SIMPLIFY = FALSE)  # sum of frobenius norm
+  iter_error[iter, "e"] <- lapply(e_diff, FUN = function(x) Matrix::norm(x, type = "F")) %>% Reduce("+", .)
+  u_diff <- mapply(FUN = function(old, new) old - new, u_old, u_new, SIMPLIFY = FALSE)
+  iter_error[iter, "u"] <- lapply(u_diff, FUN = function(x) Matrix::norm(x, type = "F")) %>% Reduce("+", .)
+  iter_error[iter, "w"] <- Matrix::norm(w_old - w_new, type = "F")
   
   eta_old <- eta_new
   theta_old <- theta_new
   Z_old <- Z_new
+  alpha_old <- alpha_new
   e_old <- e_new
   u_old <- u_new
   w_old <- w_new
 }
 ```
 
-![\\lambda\_1,
-\\lambda\_2](https://latex.codecogs.com/png.latex?%5Clambda_1%2C%20%5Clambda_2
-"\\lambda_1, \\lambda_2")는 임의로 0.5로 설정.
+![\\lambda\_1, \\lambda\_2,
+\\delta](https://latex.codecogs.com/png.latex?%5Clambda_1%2C%20%5Clambda_2%2C%20%5Cdelta
+"\\lambda_1, \\lambda_2, \\delta") 값에 따라서 iteration error 차이가 큼…
+
+``` r
+iter_error %>% data.frame %>%
+  mutate(iter = 1:nrow(.)) %>%
+  filter(iter %in% 1:10) %>% 
+  gather(key = "estimator", value = "value", -iter) %>%
+  ggplot() +
+  geom_line(aes(x = iter, y = value, group = estimator, color = estimator)) +
+  facet_wrap(~estimator, scales = "free_y")
+```
 
 ## Question
 
