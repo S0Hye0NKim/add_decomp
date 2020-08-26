@@ -47,13 +47,14 @@ m <- 20
 p <- 50
 r <- 500
 b <- 20
+num_rank <- 5
 
 X <- matrix(rnorm(n*p, mean = 0, sd = 1), nrow = n) %>% cbind(1, .)   #add intercept term in X
 sp_mat <- rsparsematrix(nrow = p+1, ncol = m, nnz = r)             # make sparse matrix
 LR_mat <- matrix(rnorm(m*(p+1), mean = 0, sd = 1), ncol = m)      # make low rank matrix using SVD
 SVD <- svd(LR_mat)
 D_mat <- diag(SVD$d)
-idx <- sample(1:m, 15)
+idx <- (num_rank+1):m
 D_mat[idx, idx] <- 0
 LR_mat <- SVD$u %*% D_mat %*% t(SVD$v)          
 
@@ -150,16 +151,15 @@ for(l in 1:b){
 "\\boldsymbol{\\eta}^{(g)}, \\boldsymbol{\\theta}^{(g)}, \\boldsymbol{w}^{(g)}\\in \\mathbb{R}^{(p+1)\\times K}\\\\ \\boldsymbol{\\alpha}^{(g)} \\in \\mathbb{R}^{p+1} \\\\ \\boldsymbol{e}^{(\\ell)(g)}, \\boldsymbol{u}^{(\\ell)(g)}, \\in \\mathbb{R}^{n}\\\\subject\\; to \\; \\boldsymbol{\\eta}^{(g)} - \\boldsymbol{\\theta}^{(g)} = 0, \\; and \\;\\boldsymbol{Y}^{(g)} - \\boldsymbol{X}\\boldsymbol{\\alpha}^{(g)} - \\boldsymbol{V}^{(\\ell)}\\boldsymbol{\\eta}^{(g)} - \\boldsymbol{e}^{(\\ell)(g)} = 0")  
 
 ``` r
-eta_old <- matrix(rpois(m*(p+1)*K, lambda = 5), nrow = (p+1)*K, ncol = m) 
+eta_old <- matrix(0, nrow = (p+1)*K, ncol = m) 
 theta_old <- eta_old
-#theta_old <- matrix(rpois(m*(p+1)*K, lambda = 3), nrow = (p+1)*K, ncol = m) 
-alpha_old <- matrix(1, nrow = p+1, ncol = m)
+alpha_old <- matrix(0, nrow = p+1, ncol = m)
 Z_old <- X %*% alpha_old
 e_old <- list()
 for(l in 1:b) {e_old[[l]] <- Y - Z_old - V[[l]] %*% eta_old}
 u_old <- list()
-for(l in 1:b) {u_old[[l]] <- matrix(1, nrow = n, ncol = m)}
-w_old <- matrix(1, nrow = (p+1)*K, ncol = m)
+for(l in 1:b) {u_old[[l]] <- matrix(0, nrow = n, ncol = m)}
+w_old <- matrix(0, nrow = (p+1)*K, ncol = m)
 ```
 
 # 2\. Algorithm
@@ -171,9 +171,9 @@ w_old <- matrix(1, nrow = (p+1)*K, ncol = m)
 ``` r
 max_iter <- 50
 delta <- 3
-lambda_1 <- 50
-lambda_2 <- 50
-tol_error <- 0.01
+lambda_1 <- 10          #low rank
+lambda_2 <- 7           #sparse
+tol_error <- 10
 iter_error <- matrix(ncol = 6, nrow = max_iter) %>%
   `colnames<-`(value = c("eta", "theta", "alpha", "e", "u", "w"))
 
@@ -194,10 +194,9 @@ for(iter in 1:max_iter){
   theta_new <- matrix(nrow = (p+1)*K, ncol = m)
   threshold <- lambda_2/delta
   for (g in 1:m) {
-    value <- eta_new[, g] - w_old[, g]/delta 
-    theta_new[, g] <- case_when(value < -threshold ~ value + threshold, 
-                                abs(value) <= threshold ~ 0, 
-                                value > threshold ~ value - threshold)
+    r_g <- eta_new[, g] - w_old[, g]/delta
+    value <- 1 - (lambda_2/(delta * abs(r_g)))
+    theta_new[, g] <- ifelse(value > 0, value * r_g, 0)
   }
   # Process for Z=XA
   Y_list <- list()
@@ -214,11 +213,12 @@ for(iter in 1:max_iter){
   e_new <- list()
   for(l in 1:b){
     e_new[[l]] <- matrix(nrow = n, ncol = m)
-    common_val <- Y - Z_new - V[[l]] %*% eta_new
     for(g in 1:m) {
-      e_new[[l]][, g] <- case_when(e_old[[l]][, g] < 0 ~ common_val[, g] - (u_old[[l]][, g] + tau_seq[[l]] -1)/delta,
-                                   e_old[[l]][, g] == 0 ~ common_val[, g] - u_old[[l]][, g]/delta, 
-                                   e_old[[l]][, g] > 0 ~ common_val[, g] - (u_old[[l]][, g] + tau_seq[[l]])/delta)
+     error <- Y[, g] - Z_new[, g] - V[[l]] %*% eta_new[, g]   #error = Y - XA - VH
+     value <- error + u_old[[l]][, g]/delta
+     e_new[[l]][, g] <- case_when(value > tau_seq[l]/delta ~ value - tau_seq[l]/delta, 
+                                  value < (tau_seq[l]-1)/delta ~ value - (tau_seq[l]-1)/delta, 
+                                  value >=(tau_seq[l]-1)/delta & value <= tau_seq[l]/delta ~ 0)
     }
   }
   
@@ -240,6 +240,8 @@ for(iter in 1:max_iter){
   iter_error[iter, "u"] <- lapply(u_diff, FUN = function(x) Matrix::norm(x, type = "F")) %>% Reduce("+", .)
   iter_error[iter, "w"] <- Matrix::norm(w_old - w_new, type = "F")
   
+  #if(iter_error[iter, ] < tol_error) break
+  
   eta_old <- eta_new
   theta_old <- theta_new
   Z_old <- Z_new
@@ -247,24 +249,24 @@ for(iter in 1:max_iter){
   e_old <- e_new
   u_old <- u_new
   w_old <- w_new
+  
+  if(iter%%10 == 0) {print(paste0("iter = ", iter))}
 }
 ```
 
 ![\\lambda\_1, \\lambda\_2,
 \\delta](https://latex.codecogs.com/png.latex?%5Clambda_1%2C%20%5Clambda_2%2C%20%5Cdelta
-"\\lambda_1, \\lambda_2, \\delta") 값에 따라서 iteration error 차이가 큼…
+"\\lambda_1, \\lambda_2, \\delta") 어떻게?
 
 ``` r
 iter_error %>% data.frame %>%
   mutate(iter = 1:nrow(.)) %>%
-  filter(iter %in% 1:10) %>% 
+  filter(iter %in% 25:50) %>% 
   gather(key = "estimator", value = "value", -iter) %>%
   ggplot() +
   geom_line(aes(x = iter, y = value, group = estimator, color = estimator)) +
   facet_wrap(~estimator, scales = "free_y")
 ```
-
-## Question
 
   - Stopping criteria
 
@@ -272,4 +274,9 @@ iter_error %>% data.frame %>%
 ![\\begin{aligned}&||\\eta^{k+1}-\\eta^{k}||\_2^2+||\\theta^{k+1}-\\theta^k||\_2^2+||\\alpha^{k+1}-\\alpha^k||\_2^2\\\\&+||e^{k+1}-e^k||\_2^2+||u^{k+1}-u^k||\_2^2+||w^{k+1}-w^k||\_2^2
 \\le
 \\epsilon\_{tol}\\end{aligned}](https://latex.codecogs.com/png.latex?%5Cbegin%7Baligned%7D%26%7C%7C%5Ceta%5E%7Bk%2B1%7D-%5Ceta%5E%7Bk%7D%7C%7C_2%5E2%2B%7C%7C%5Ctheta%5E%7Bk%2B1%7D-%5Ctheta%5Ek%7C%7C_2%5E2%2B%7C%7C%5Calpha%5E%7Bk%2B1%7D-%5Calpha%5Ek%7C%7C_2%5E2%5C%5C%26%2B%7C%7Ce%5E%7Bk%2B1%7D-e%5Ek%7C%7C_2%5E2%2B%7C%7Cu%5E%7Bk%2B1%7D-u%5Ek%7C%7C_2%5E2%2B%7C%7Cw%5E%7Bk%2B1%7D-w%5Ek%7C%7C_2%5E2%20%5Cle%20%5Cepsilon_%7Btol%7D%5Cend%7Baligned%7D
-"\\begin{aligned}&||\\eta^{k+1}-\\eta^{k}||_2^2+||\\theta^{k+1}-\\theta^k||_2^2+||\\alpha^{k+1}-\\alpha^k||_2^2\\\\&+||e^{k+1}-e^k||_2^2+||u^{k+1}-u^k||_2^2+||w^{k+1}-w^k||_2^2 \\le \\epsilon_{tol}\\end{aligned}")
+"\\begin{aligned}&||\\eta^{k+1}-\\eta^{k}||_2^2+||\\theta^{k+1}-\\theta^k||_2^2+||\\alpha^{k+1}-\\alpha^k||_2^2\\\\&+||e^{k+1}-e^k||_2^2+||u^{k+1}-u^k||_2^2+||w^{k+1}-w^k||_2^2 \\le \\epsilon_{tol}\\end{aligned}")  
+
+``` r
+sing_val <- svd(alpha_new)$d
+sum(sing_val[1:5])/sum(sing_val)
+```
