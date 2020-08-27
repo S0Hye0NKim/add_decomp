@@ -74,9 +74,9 @@ if ![\\theta=0](https://latex.codecogs.com/png.latex?%5Ctheta%3D0
 -----
 
   
-![\\therefore\\hat{\\theta}^{(g)}\_j=(1-\\frac{\\lambda\_2/\\delta}{r\_j^{(g)}})\_+r\_j^{(g)}\\quad\\text{where
-}r\_j^{(g)}=\\eta\_j^{(g)}-w\_j^{(g)}/\\delta](https://latex.codecogs.com/png.latex?%5Ctherefore%5Chat%7B%5Ctheta%7D%5E%7B%28g%29%7D_j%3D%281-%5Cfrac%7B%5Clambda_2%2F%5Cdelta%7D%7Br_j%5E%7B%28g%29%7D%7D%29_%2Br_j%5E%7B%28g%29%7D%5Cquad%5Ctext%7Bwhere%20%7Dr_j%5E%7B%28g%29%7D%3D%5Ceta_j%5E%7B%28g%29%7D-w_j%5E%7B%28g%29%7D%2F%5Cdelta
-"\\therefore\\hat{\\theta}^{(g)}_j=(1-\\frac{\\lambda_2/\\delta}{r_j^{(g)}})_+r_j^{(g)}\\quad\\text{where }r_j^{(g)}=\\eta_j^{(g)}-w_j^{(g)}/\\delta")  
+![\\therefore\\hat{\\theta}^{(g)}\_j=(1-\\frac{\\lambda\_2/\\delta}{||r\_j^{(g)}||})\_+r\_j^{(g)}\\quad\\text{where
+}r\_j^{(g)}=\\eta\_j^{(g)}-w\_j^{(g)}/\\delta](https://latex.codecogs.com/png.latex?%5Ctherefore%5Chat%7B%5Ctheta%7D%5E%7B%28g%29%7D_j%3D%281-%5Cfrac%7B%5Clambda_2%2F%5Cdelta%7D%7B%7C%7Cr_j%5E%7B%28g%29%7D%7C%7C%7D%29_%2Br_j%5E%7B%28g%29%7D%5Cquad%5Ctext%7Bwhere%20%7Dr_j%5E%7B%28g%29%7D%3D%5Ceta_j%5E%7B%28g%29%7D-w_j%5E%7B%28g%29%7D%2F%5Cdelta
+"\\therefore\\hat{\\theta}^{(g)}_j=(1-\\frac{\\lambda_2/\\delta}{||r_j^{(g)}||})_+r_j^{(g)}\\quad\\text{where }r_j^{(g)}=\\eta_j^{(g)}-w_j^{(g)}/\\delta")  
 
   
 ![\\begin{aligned}\\frac{\\partial^2 Q}{\\partial
