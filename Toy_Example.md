@@ -10,6 +10,7 @@ library(tidyverse)
 library(ggplot2)
 library(splines)
 library(Matrix)
+library(pander)
 ```
 
 # 0\. Initial Setting
@@ -46,7 +47,7 @@ n <- 300
 m <- 20
 p <- 50
 r <- 500
-b <- 20
+b <- 21
 num_rank <- 5
 
 X <- matrix(rnorm(n*p, mean = 0, sd = 1), nrow = n) %>% cbind(1, .)   #add intercept term in X
@@ -170,9 +171,9 @@ w_old <- matrix(0, nrow = (p+1)*K, ncol = m)
 
 ``` r
 max_iter <- 50
-delta <- 3
-lambda_1 <- 10          #low rank
-lambda_2 <- 7           #sparse
+delta <- 5
+lambda_1 <- 15          #low rank penalty
+lambda_2 <- 28           #sparse penalty
 tol_error <- 10
 iter_error <- matrix(ncol = 6, nrow = max_iter) %>%
   `colnames<-`(value = c("eta", "theta", "alpha", "e", "u", "w"))
@@ -261,12 +262,14 @@ for(iter in 1:max_iter){
 ``` r
 iter_error %>% data.frame %>%
   mutate(iter = 1:nrow(.)) %>%
-  filter(iter %in% 25:50) %>% 
+  filter(iter %in% 15:50) %>% 
   gather(key = "estimator", value = "value", -iter) %>%
   ggplot() +
   geom_line(aes(x = iter, y = value, group = estimator, color = estimator)) +
   facet_wrap(~estimator, scales = "free_y")
 ```
+
+![](Toy_Example_files/figure-gfm/unnamed-chunk-8-1.png)<!-- -->
 
   - Stopping criteria
 
@@ -276,7 +279,180 @@ iter_error %>% data.frame %>%
 \\epsilon\_{tol}\\end{aligned}](https://latex.codecogs.com/png.latex?%5Cbegin%7Baligned%7D%26%7C%7C%5Ceta%5E%7Bk%2B1%7D-%5Ceta%5E%7Bk%7D%7C%7C_2%5E2%2B%7C%7C%5Ctheta%5E%7Bk%2B1%7D-%5Ctheta%5Ek%7C%7C_2%5E2%2B%7C%7C%5Calpha%5E%7Bk%2B1%7D-%5Calpha%5Ek%7C%7C_2%5E2%5C%5C%26%2B%7C%7Ce%5E%7Bk%2B1%7D-e%5Ek%7C%7C_2%5E2%2B%7C%7Cu%5E%7Bk%2B1%7D-u%5Ek%7C%7C_2%5E2%2B%7C%7Cw%5E%7Bk%2B1%7D-w%5Ek%7C%7C_2%5E2%20%5Cle%20%5Cepsilon_%7Btol%7D%5Cend%7Baligned%7D
 "\\begin{aligned}&||\\eta^{k+1}-\\eta^{k}||_2^2+||\\theta^{k+1}-\\theta^k||_2^2+||\\alpha^{k+1}-\\alpha^k||_2^2\\\\&+||e^{k+1}-e^k||_2^2+||u^{k+1}-u^k||_2^2+||w^{k+1}-w^k||_2^2 \\le \\epsilon_{tol}\\end{aligned}")  
 
+# 3\. Evaluation
+
+![\\Gamma(\\tau)](https://latex.codecogs.com/png.latex?%5CGamma%28%5Ctau%29
+"\\Gamma(\\tau)")는 ![\\tau](https://latex.codecogs.com/png.latex?%5Ctau
+"\\tau")에 상관 없이 동일하므로, quantile 상관 없이
+![Y\\approx\\hat{Y}\_{\\tau\_\\ell}](https://latex.codecogs.com/png.latex?Y%5Capprox%5Chat%7BY%7D_%7B%5Ctau_%5Cell%7D
+"Y\\approx\\hat{Y}_{\\tau_\\ell}") 동일.
+
+``` r
+Y_hat_tau <- lapply(V, FUN = function(x) x %*% theta_new + Z_new) %>%
+  `names<-`(value = tau_seq)
+```
+
+### Low rank matrix
+
+  
+![\\frac{\\sigma\_1+\\cdots+\\sigma\_5}{\\sigma\_1+\\cdots+\\sigma\_{20}}\\quad\\text{where
+}\\sigma\_i\\text{ is a singular
+value}](https://latex.codecogs.com/png.latex?%5Cfrac%7B%5Csigma_1%2B%5Ccdots%2B%5Csigma_5%7D%7B%5Csigma_1%2B%5Ccdots%2B%5Csigma_%7B20%7D%7D%5Cquad%5Ctext%7Bwhere%20%7D%5Csigma_i%5Ctext%7B%20is%20a%20singular%20value%7D
+"\\frac{\\sigma_1+\\cdots+\\sigma_5}{\\sigma_1+\\cdots+\\sigma_{20}}\\quad\\text{where }\\sigma_i\\text{ is a singular value}")  
+
 ``` r
 sing_val <- svd(alpha_new)$d
 sum(sing_val[1:5])/sum(sing_val)
 ```
+
+    ## [1] 0.4385151
+
+  
+![||A-\\hat{A}||\_F](https://latex.codecogs.com/png.latex?%7C%7CA-%5Chat%7BA%7D%7C%7C_F
+"||A-\\hat{A}||_F")  
+
+``` r
+(LR_mat - alpha_new) %>%
+  Matrix::norm(type = "F")
+```
+
+    ## [1] 44.15708
+
+### Sparse matrix
+
+  
+![||V\_{\\tau\_\\ell}\\hat{\\Theta}-X\\Gamma(\\tau)||\_F](https://latex.codecogs.com/png.latex?%7C%7CV_%7B%5Ctau_%5Cell%7D%5Chat%7B%5CTheta%7D-X%5CGamma%28%5Ctau%29%7C%7C_F
+"||V_{\\tau_\\ell}\\hat{\\Theta}-X\\Gamma(\\tau)||_F")  
+
+``` r
+lapply(V, FUN = function(x) ((x %*% theta_new) - X %*% sp_mat) %>% Matrix::norm(type = "F")) %>%
+  `names<-`(value = tau_seq) %>%
+  bind_cols %>% t() 
+```
+
+    ##          [,1]
+    ## 0.4  325.6633
+    ## 0.41 343.5448
+    ## 0.42 309.8238
+    ## 0.43 299.9283
+    ## 0.44 300.1387
+    ## 0.45 302.5406
+    ## 0.46 302.0807
+    ## 0.47 301.2192
+    ## 0.48 301.8234
+    ## 0.49 301.8836
+    ## 0.5  301.6634
+    ## 0.51 302.4676
+    ## 0.52 302.9132
+    ## 0.53 302.7039
+    ## 0.54 303.9290
+    ## 0.55 304.7996
+    ## 0.56 302.9462
+    ## 0.57 303.3842
+    ## 0.58 313.3453
+    ## 0.59 345.5079
+    ## 0.6  329.1110
+
+![X\\hat{\\Gamma}(\\tau)=V\_{\\tau\_\\ell}\\hat{\\Theta}](https://latex.codecogs.com/png.latex?X%5Chat%7B%5CGamma%7D%28%5Ctau%29%3DV_%7B%5Ctau_%5Cell%7D%5Chat%7B%5CTheta%7D
+"X\\hat{\\Gamma}(\\tau)=V_{\\tau_\\ell}\\hat{\\Theta}")
+
+![\\hat{\\Gamma}(\\tau)=(X^TX)^{-1}X^TV\_{\\tau\_\\ell}\\hat{\\Theta}](https://latex.codecogs.com/png.latex?%5Chat%7B%5CGamma%7D%28%5Ctau%29%3D%28X%5ETX%29%5E%7B-1%7DX%5ETV_%7B%5Ctau_%5Cell%7D%5Chat%7B%5CTheta%7D
+"\\hat{\\Gamma}(\\tau)=(X^TX)^{-1}X^TV_{\\tau_\\ell}\\hat{\\Theta}")
+
+``` r
+gamma_tau_hat <- lapply(V, FUN = function(x) solve(t(X) %*% X) %*% t(X) %*% x %*% theta_new) %>%
+  `names<-`(value = tau_seq)
+lapply(gamma_tau_hat, FUN = function(x) (x - sp_mat) %>% Matrix::norm(type = "F")) %>%
+  bind_cols %>% t()
+```
+
+    ##          [,1]
+    ## 0.4  19.36359
+    ## 0.41 20.31675
+    ## 0.42 18.36523
+    ## 0.43 17.67847
+    ## 0.44 17.66829
+    ## 0.45 17.83623
+    ## 0.46 17.79435
+    ## 0.47 17.72865
+    ## 0.48 17.77671
+    ## 0.49 17.77540
+    ## 0.5  17.74744
+    ## 0.51 17.79991
+    ## 0.52 17.82164
+    ## 0.53 17.78757
+    ## 0.54 17.86407
+    ## 0.55 17.91877
+    ## 0.56 17.77074
+    ## 0.57 17.80109
+    ## 0.58 18.48764
+    ## 0.59 20.38757
+    ## 0.6  19.47473
+
+![\\\#\\text{ of non-zero entry in
+}\\Gamma(\\tau)=500](https://latex.codecogs.com/png.latex?%5C%23%5Ctext%7B%20of%20non-zero%20entry%20in%20%7D%5CGamma%28%5Ctau%29%3D500
+"\\#\\text{ of non-zero entry in }\\Gamma(\\tau)=500")
+
+![x\<0.1^5](https://latex.codecogs.com/png.latex?x%3C0.1%5E5
+"x\<0.1^5")이면 0으로 간주.
+
+### sparsity pattern check
+
+  
+![\\begin{aligned}\\text{common}&:=\\text{zero index in
+}\\Gamma(\\tau)=\\text{zero index in
+}\\hat{\\Gamma}(\\tau)\\\\\\text{diff}&:=\\text{zero index in
+}\\Gamma(\\tau)\\ne\\text{zero index in
+}\\hat{\\Gamma}(\\tau)\\\\\\end{aligned}](https://latex.codecogs.com/png.latex?%5Cbegin%7Baligned%7D%5Ctext%7Bcommon%7D%26%3A%3D%5Ctext%7Bzero%20index%20in%20%7D%5CGamma%28%5Ctau%29%3D%5Ctext%7Bzero%20index%20in%20%7D%5Chat%7B%5CGamma%7D%28%5Ctau%29%5C%5C%5Ctext%7Bdiff%7D%26%3A%3D%5Ctext%7Bzero%20index%20in%20%7D%5CGamma%28%5Ctau%29%5Cne%5Ctext%7Bzero%20index%20in%20%7D%5Chat%7B%5CGamma%7D%28%5Ctau%29%5C%5C%5Cend%7Baligned%7D
+"\\begin{aligned}\\text{common}&:=\\text{zero index in }\\Gamma(\\tau)=\\text{zero index in }\\hat{\\Gamma}(\\tau)\\\\\\text{diff}&:=\\text{zero index in }\\Gamma(\\tau)\\ne\\text{zero index in }\\hat{\\Gamma}(\\tau)\\\\\\end{aligned}")  
+
+``` r
+num_zero <- which(sp_mat==0, arr.ind = TRUE) %>% nrow
+print(paste0("The number of zero entry in sp_mat is ", num_zero))
+```
+
+    ## [1] "The number of zero entry in sp_mat is 520"
+
+``` r
+check_sp_pattern <- function(true, est, tol = 0.1^5, idx = FALSE) {
+  # diff1 means that true = 0 but est != 0
+  # diff2 means that true != 0 but est = 0
+  zero_idx_true <- which(abs(true) < tol, arr.ind = TRUE) %>% as_tibble
+  zero_idx_est <- which(abs(est) < tol, arr.ind = TRUE) %>% as_tibble
+  common <- semi_join(zero_idx_true, zero_idx_est, by = c("row", "col"))
+  diff_1 <- anti_join(zero_idx_true, zero_idx_est, by = c("row", "col"))
+  diff_2 <- anti_join(zero_idx_est, zero_idx_true, by = c("row", "col"))
+  if(idx == FALSE) {return(data.frame(diff1 = nrow(diff_1), common = nrow(common), diff2 = nrow(diff_2)))
+    } else {return(list(common = common, diff = diff))}
+}
+```
+
+``` r
+gamma_tau_hat %>%
+  lapply(FUN = function(x) check_sp_pattern(true = sp_mat, est = x)) %>%
+  bind_rows(.id = "tau") %>%
+  mutate(accuracy = common/num_zero)
+```
+
+    ##     tau diff1 common diff2  accuracy
+    ## 1   0.4   133    387   262 0.7442308
+    ## 2  0.41   226    294   188 0.5653846
+    ## 3  0.42   225    295   188 0.5673077
+    ## 4  0.43   226    294   188 0.5653846
+    ## 5  0.44   226    294   187 0.5653846
+    ## 6  0.45   226    294   188 0.5653846
+    ## 7  0.46   227    293   188 0.5634615
+    ## 8  0.47   205    315   195 0.6057692
+    ## 9  0.48   205    315   196 0.6057692
+    ## 10 0.49   205    315   195 0.6057692
+    ## 11  0.5   203    317   198 0.6096154
+    ## 12 0.51   205    315   196 0.6057692
+    ## 13 0.52   207    313   196 0.6019231
+    ## 14 0.53   207    313   196 0.6019231
+    ## 15 0.54   221    299   189 0.5750000
+    ## 16 0.55   220    300   189 0.5769231
+    ## 17 0.56   221    299   189 0.5750000
+    ## 18 0.57   221    299   189 0.5750000
+    ## 19 0.58   220    300   189 0.5769231
+    ## 20 0.59   221    299   189 0.5750000
+    ## 21  0.6   137    383   265 0.7365385

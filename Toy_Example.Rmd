@@ -14,6 +14,7 @@ library(tidyverse)
 library(ggplot2)
 library(splines)
 library(Matrix)
+library(pander)
 ```
 
 
@@ -38,7 +39,7 @@ n <- 300
 m <- 20
 p <- 50
 r <- 500
-b <- 20
+b <- 21
 num_rank <- 5
 
 X <- matrix(rnorm(n*p, mean = 0, sd = 1), nrow = n) %>% cbind(1, .)   #add intercept term in X
@@ -135,11 +136,11 @@ w_old <- matrix(0, nrow = (p+1)*K, ncol = m)
 
 $$\begin{aligned}\boldsymbol{Y}&=\boldsymbol{XA}+\boldsymbol{X\Gamma}(\tau)\\&=\boldsymbol{Z}+\boldsymbol{V}_{\tau_\ell}\boldsymbol{\Theta}\end{aligned}$$
 
-```{r eval = FALSE}
+```{r echo = TRUE, results = "hide"}
 max_iter <- 50
-delta <- 3
-lambda_1 <- 10          #low rank
-lambda_2 <- 7           #sparse
+delta <- 5
+lambda_1 <- 15          #low rank penalty
+lambda_2 <- 28           #sparse penalty
 tol_error <- 10
 iter_error <- matrix(ncol = 6, nrow = max_iter) %>%
   `colnames<-`(value = c("eta", "theta", "alpha", "e", "u", "w"))
@@ -225,10 +226,10 @@ for(iter in 1:max_iter){
 $\lambda_1, \lambda_2, \delta$ 어떻게?
 
 
-```{r eval = FALSE}
+```{r}
 iter_error %>% data.frame %>%
   mutate(iter = 1:nrow(.)) %>%
-  filter(iter %in% 25:50) %>% 
+  filter(iter %in% 15:50) %>% 
   gather(key = "estimator", value = "value", -iter) %>%
   ggplot() +
   geom_line(aes(x = iter, y = value, group = estimator, color = estimator)) +
@@ -240,11 +241,96 @@ iter_error %>% data.frame %>%
 
 $$\begin{aligned}&||\eta^{k+1}-\eta^{k}||_2^2+||\theta^{k+1}-\theta^k||_2^2+||\alpha^{k+1}-\alpha^k||_2^2\\&+||e^{k+1}-e^k||_2^2+||u^{k+1}-u^k||_2^2+||w^{k+1}-w^k||_2^2 \le \epsilon_{tol}\end{aligned}$$
 
+# 3. Evaluation
 
-```{r eval = FALSE}
+$\Gamma(\tau)$는 $\tau$에 상관 없이 동일하므로, quantile 상관 없이 $Y\approx\hat{Y}_{\tau_\ell}$ 동일.
+
+```{r}
+Y_hat_tau <- lapply(V, FUN = function(x) x %*% theta_new + Z_new) %>%
+  `names<-`(value = tau_seq)
+```
+
+### Low rank matrix
+
+$$\frac{\sigma_1+\cdots+\sigma_5}{\sigma_1+\cdots+\sigma_{20}}\quad\text{where }\sigma_i\text{ is a singular value}$$
+
+```{r}
 sing_val <- svd(alpha_new)$d
 sum(sing_val[1:5])/sum(sing_val)
 ```
+
+$$||A-\hat{A}||_F$$
+
+```{r}
+(LR_mat - alpha_new) %>%
+  Matrix::norm(type = "F")
+```
+
+
+### Sparse matrix
+
+$$||V_{\tau_\ell}\hat{\Theta}-X\Gamma(\tau)||_F$$
+
+```{r}
+lapply(V, FUN = function(x) ((x %*% theta_new) - X %*% sp_mat) %>% Matrix::norm(type = "F")) %>%
+  `names<-`(value = tau_seq) %>%
+  bind_cols %>% t() 
+```
+
+$X\hat{\Gamma}(\tau)=V_{\tau_\ell}\hat{\Theta}$
+
+$\hat{\Gamma}(\tau)=(X^TX)^{-1}X^TV_{\tau_\ell}\hat{\Theta}$
+
+```{r}
+gamma_tau_hat <- lapply(V, FUN = function(x) solve(t(X) %*% X) %*% t(X) %*% x %*% theta_new) %>%
+  `names<-`(value = tau_seq)
+lapply(gamma_tau_hat, FUN = function(x) (x - sp_mat) %>% Matrix::norm(type = "F")) %>%
+  bind_cols %>% t()
+```
+
+
+$\#\text{ of non-zero entry in }\Gamma(\tau)=500$
+
+$x<0.1^5$이면 0으로 간주.
+
+
+### sparsity pattern check
+
+$$\begin{aligned}\text{common}&:=\text{zero index in }\Gamma(\tau)=\text{zero index in }\hat{\Gamma}(\tau)\\\text{diff}&:=\text{zero index in }\Gamma(\tau)\ne\text{zero index in }\hat{\Gamma}(\tau)\\\end{aligned}$$
+
+```{r}
+num_zero <- which(sp_mat==0, arr.ind = TRUE) %>% nrow
+print(paste0("The number of zero entry in sp_mat is ", num_zero))
+```
+
+```{r}
+check_sp_pattern <- function(true, est, tol = 0.1^5, idx = FALSE) {
+  # diff1 means that true = 0 but est != 0
+  # diff2 means that true != 0 but est = 0
+  zero_idx_true <- which(abs(true) < tol, arr.ind = TRUE) %>% as_tibble
+  zero_idx_est <- which(abs(est) < tol, arr.ind = TRUE) %>% as_tibble
+  common <- semi_join(zero_idx_true, zero_idx_est, by = c("row", "col"))
+  diff_1 <- anti_join(zero_idx_true, zero_idx_est, by = c("row", "col"))
+  diff_2 <- anti_join(zero_idx_est, zero_idx_true, by = c("row", "col"))
+  if(idx == FALSE) {return(data.frame(diff1 = nrow(diff_1), common = nrow(common), diff2 = nrow(diff_2)))
+    } else {return(list(common = common, diff = diff))}
+}
+```
+
+
+```{r}
+gamma_tau_hat %>%
+  lapply(FUN = function(x) check_sp_pattern(true = sp_mat, est = x)) %>%
+  bind_rows(.id = "tau") %>%
+  mutate(accuracy = common/num_zero)
+```
+
+
+
+
+
+
+
 
 
 
