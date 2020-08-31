@@ -138,15 +138,15 @@ b)\\}\_+)\\end{aligned}](https://latex.codecogs.com/png.latex?%5Cbegin%7Baligned
 
   
 ![e\_i^{(\\ell)(g)} = \\text{argmin
-}\\rho\_{\\tau\_{\\ell}}(e\_i^{(\\ell)(g)})-u\_i^{(\\ell)(g)}e\_i^{(\\ell)(g)}+\\frac{\\delta}{2}(Y\_i^{(g)}-X\_i\\alpha^{(g)}-V\_i^{(\\ell)}\\eta^{(g)}-e\_i^{(\\ell)(g)})^2](https://latex.codecogs.com/png.latex?e_i%5E%7B%28%5Cell%29%28g%29%7D%20%3D%20%5Ctext%7Bargmin%20%7D%5Crho_%7B%5Ctau_%7B%5Cell%7D%7D%28e_i%5E%7B%28%5Cell%29%28g%29%7D%29-u_i%5E%7B%28%5Cell%29%28g%29%7De_i%5E%7B%28%5Cell%29%28g%29%7D%2B%5Cfrac%7B%5Cdelta%7D%7B2%7D%28Y_i%5E%7B%28g%29%7D-X_i%5Calpha%5E%7B%28g%29%7D-V_i%5E%7B%28%5Cell%29%7D%5Ceta%5E%7B%28g%29%7D-e_i%5E%7B%28%5Cell%29%28g%29%7D%29%5E2
-"e_i^{(\\ell)(g)} = \\text{argmin }\\rho_{\\tau_{\\ell}}(e_i^{(\\ell)(g)})-u_i^{(\\ell)(g)}e_i^{(\\ell)(g)}+\\frac{\\delta}{2}(Y_i^{(g)}-X_i\\alpha^{(g)}-V_i^{(\\ell)}\\eta^{(g)}-e_i^{(\\ell)(g)})^2")  
+}\\frac{1}{n}\\rho\_{\\tau\_{\\ell}}(e\_i^{(\\ell)(g)})-u\_i^{(\\ell)(g)}e\_i^{(\\ell)(g)}+\\frac{\\delta}{2}(Y\_i^{(g)}-X\_i\\alpha^{(g)}-V\_i^{(\\ell)}\\eta^{(g)}-e\_i^{(\\ell)(g)})^2](https://latex.codecogs.com/png.latex?e_i%5E%7B%28%5Cell%29%28g%29%7D%20%3D%20%5Ctext%7Bargmin%20%7D%5Cfrac%7B1%7D%7Bn%7D%5Crho_%7B%5Ctau_%7B%5Cell%7D%7D%28e_i%5E%7B%28%5Cell%29%28g%29%7D%29-u_i%5E%7B%28%5Cell%29%28g%29%7De_i%5E%7B%28%5Cell%29%28g%29%7D%2B%5Cfrac%7B%5Cdelta%7D%7B2%7D%28Y_i%5E%7B%28g%29%7D-X_i%5Calpha%5E%7B%28g%29%7D-V_i%5E%7B%28%5Cell%29%7D%5Ceta%5E%7B%28g%29%7D-e_i%5E%7B%28%5Cell%29%28g%29%7D%29%5E2
+"e_i^{(\\ell)(g)} = \\text{argmin }\\frac{1}{n}\\rho_{\\tau_{\\ell}}(e_i^{(\\ell)(g)})-u_i^{(\\ell)(g)}e_i^{(\\ell)(g)}+\\frac{\\delta}{2}(Y_i^{(g)}-X_i\\alpha^{(g)}-V_i^{(\\ell)}\\eta^{(g)}-e_i^{(\\ell)(g)})^2")  
 
   
 ![\\frac{\\partial Q}{\\partial
-e\_i^{(\\ell)(g)}}=-\\delta(Y\_i^{(g)}-X\_i\\alpha^{(g)}-V\_i^{(\\ell)}\\eta^{(g)}-e\_i^{(\\ell)(g)})-u\_i^{(\\ell)(g)}+\\frac{\\partial
+e\_i^{(\\ell)(g)}}=-\\delta(Y\_i^{(g)}-X\_i\\alpha^{(g)}-V\_i^{(\\ell)}\\eta^{(g)}-e\_i^{(\\ell)(g)})-u\_i^{(\\ell)(g)}+\\frac{1}{n}\\frac{\\partial
 \\rho\_{\\tau\_{\\ell}}(e\_i^{(\\ell)(g)})}{\\partial
-e\_i^{(\\ell)(g)}}](https://latex.codecogs.com/png.latex?%5Cfrac%7B%5Cpartial%20Q%7D%7B%5Cpartial%20e_i%5E%7B%28%5Cell%29%28g%29%7D%7D%3D-%5Cdelta%28Y_i%5E%7B%28g%29%7D-X_i%5Calpha%5E%7B%28g%29%7D-V_i%5E%7B%28%5Cell%29%7D%5Ceta%5E%7B%28g%29%7D-e_i%5E%7B%28%5Cell%29%28g%29%7D%29-u_i%5E%7B%28%5Cell%29%28g%29%7D%2B%5Cfrac%7B%5Cpartial%20%5Crho_%7B%5Ctau_%7B%5Cell%7D%7D%28e_i%5E%7B%28%5Cell%29%28g%29%7D%29%7D%7B%5Cpartial%20e_i%5E%7B%28%5Cell%29%28g%29%7D%7D
-"\\frac{\\partial Q}{\\partial e_i^{(\\ell)(g)}}=-\\delta(Y_i^{(g)}-X_i\\alpha^{(g)}-V_i^{(\\ell)}\\eta^{(g)}-e_i^{(\\ell)(g)})-u_i^{(\\ell)(g)}+\\frac{\\partial \\rho_{\\tau_{\\ell}}(e_i^{(\\ell)(g)})}{\\partial e_i^{(\\ell)(g)}}")  
+e\_i^{(\\ell)(g)}}](https://latex.codecogs.com/png.latex?%5Cfrac%7B%5Cpartial%20Q%7D%7B%5Cpartial%20e_i%5E%7B%28%5Cell%29%28g%29%7D%7D%3D-%5Cdelta%28Y_i%5E%7B%28g%29%7D-X_i%5Calpha%5E%7B%28g%29%7D-V_i%5E%7B%28%5Cell%29%7D%5Ceta%5E%7B%28g%29%7D-e_i%5E%7B%28%5Cell%29%28g%29%7D%29-u_i%5E%7B%28%5Cell%29%28g%29%7D%2B%5Cfrac%7B1%7D%7Bn%7D%5Cfrac%7B%5Cpartial%20%5Crho_%7B%5Ctau_%7B%5Cell%7D%7D%28e_i%5E%7B%28%5Cell%29%28g%29%7D%29%7D%7B%5Cpartial%20e_i%5E%7B%28%5Cell%29%28g%29%7D%7D
+"\\frac{\\partial Q}{\\partial e_i^{(\\ell)(g)}}=-\\delta(Y_i^{(g)}-X_i\\alpha^{(g)}-V_i^{(\\ell)}\\eta^{(g)}-e_i^{(\\ell)(g)})-u_i^{(\\ell)(g)}+\\frac{1}{n}\\frac{\\partial \\rho_{\\tau_{\\ell}}(e_i^{(\\ell)(g)})}{\\partial e_i^{(\\ell)(g)}}")  
 
   
 ![\\frac{\\partial^2 Q}{\\partial
@@ -173,9 +173,9 @@ if
 "e_i^{(\\ell)(g)}\<0")
 
   
-![\\begin{aligned}&-(\\epsilon\_i^{(\\ell)(g)}-e\_i^{(\\ell)(g)})-u\_i^{(\\ell)(g)}/\\delta+(\\tau-1)/\\delta=0\\\\\&e\_i=\\epsilon\_i^{(\\ell)(g)}+\\frac{u\_i^{(\\ell)(g)}}{\\delta}-\\frac{\\tau-1}{\\delta}\<0\\quad\\text{by
-hypo}\\\\&\\leftrightarrow\\;\\epsilon\_i^{(\\ell)(g)}+\\frac{u\_i^{(\\ell)(g)}}{\\delta}\<\\frac{\\tau-1}{\\delta}\\end{aligned}](https://latex.codecogs.com/png.latex?%5Cbegin%7Baligned%7D%26-%28%5Cepsilon_i%5E%7B%28%5Cell%29%28g%29%7D-e_i%5E%7B%28%5Cell%29%28g%29%7D%29-u_i%5E%7B%28%5Cell%29%28g%29%7D%2F%5Cdelta%2B%28%5Ctau-1%29%2F%5Cdelta%3D0%5C%5C%26e_i%3D%5Cepsilon_i%5E%7B%28%5Cell%29%28g%29%7D%2B%5Cfrac%7Bu_i%5E%7B%28%5Cell%29%28g%29%7D%7D%7B%5Cdelta%7D-%5Cfrac%7B%5Ctau-1%7D%7B%5Cdelta%7D%3C0%5Cquad%5Ctext%7Bby%20hypo%7D%5C%5C%26%5Cleftrightarrow%5C%3B%5Cepsilon_i%5E%7B%28%5Cell%29%28g%29%7D%2B%5Cfrac%7Bu_i%5E%7B%28%5Cell%29%28g%29%7D%7D%7B%5Cdelta%7D%3C%5Cfrac%7B%5Ctau-1%7D%7B%5Cdelta%7D%5Cend%7Baligned%7D
-"\\begin{aligned}&-(\\epsilon_i^{(\\ell)(g)}-e_i^{(\\ell)(g)})-u_i^{(\\ell)(g)}/\\delta+(\\tau-1)/\\delta=0\\\\&e_i=\\epsilon_i^{(\\ell)(g)}+\\frac{u_i^{(\\ell)(g)}}{\\delta}-\\frac{\\tau-1}{\\delta}\<0\\quad\\text{by hypo}\\\\&\\leftrightarrow\\;\\epsilon_i^{(\\ell)(g)}+\\frac{u_i^{(\\ell)(g)}}{\\delta}\<\\frac{\\tau-1}{\\delta}\\end{aligned}")  
+![\\begin{aligned}&-(\\epsilon\_i^{(\\ell)(g)}-e\_i^{(\\ell)(g)})-u\_i^{(\\ell)(g)}/\\delta+(\\tau-1)/n\\delta=0\\\\\&e\_i=\\epsilon\_i^{(\\ell)(g)}+\\frac{u\_i^{(\\ell)(g)}}{\\delta}-\\frac{\\tau-1}{n\\delta}\<0\\quad\\text{by
+hypo}\\\\&\\leftrightarrow\\;\\epsilon\_i^{(\\ell)(g)}+\\frac{u\_i^{(\\ell)(g)}}{\\delta}\<\\frac{\\tau-1}{n\\delta}\\end{aligned}](https://latex.codecogs.com/png.latex?%5Cbegin%7Baligned%7D%26-%28%5Cepsilon_i%5E%7B%28%5Cell%29%28g%29%7D-e_i%5E%7B%28%5Cell%29%28g%29%7D%29-u_i%5E%7B%28%5Cell%29%28g%29%7D%2F%5Cdelta%2B%28%5Ctau-1%29%2Fn%5Cdelta%3D0%5C%5C%26e_i%3D%5Cepsilon_i%5E%7B%28%5Cell%29%28g%29%7D%2B%5Cfrac%7Bu_i%5E%7B%28%5Cell%29%28g%29%7D%7D%7B%5Cdelta%7D-%5Cfrac%7B%5Ctau-1%7D%7Bn%5Cdelta%7D%3C0%5Cquad%5Ctext%7Bby%20hypo%7D%5C%5C%26%5Cleftrightarrow%5C%3B%5Cepsilon_i%5E%7B%28%5Cell%29%28g%29%7D%2B%5Cfrac%7Bu_i%5E%7B%28%5Cell%29%28g%29%7D%7D%7B%5Cdelta%7D%3C%5Cfrac%7B%5Ctau-1%7D%7Bn%5Cdelta%7D%5Cend%7Baligned%7D
+"\\begin{aligned}&-(\\epsilon_i^{(\\ell)(g)}-e_i^{(\\ell)(g)})-u_i^{(\\ell)(g)}/\\delta+(\\tau-1)/n\\delta=0\\\\&e_i=\\epsilon_i^{(\\ell)(g)}+\\frac{u_i^{(\\ell)(g)}}{\\delta}-\\frac{\\tau-1}{n\\delta}\<0\\quad\\text{by hypo}\\\\&\\leftrightarrow\\;\\epsilon_i^{(\\ell)(g)}+\\frac{u_i^{(\\ell)(g)}}{\\delta}\<\\frac{\\tau-1}{n\\delta}\\end{aligned}")  
 
 -----
 
@@ -184,9 +184,9 @@ if
 "e_i^{(\\ell)(g)}\>0")
 
   
-![-(\\epsilon\_i^{(\\ell)(g)}-e\_i^{(\\ell)(g)})-u\_i^{(\\ell)(g)}/\\delta+\\tau/\\delta=0\\\\e\_i=\\epsilon\_i^{(\\ell)(g)}+\\frac{u\_i^{(\\ell)(g)}}{\\delta}-\\frac{\\tau}{\\delta}\>0\\quad\\text{by
-hypo}\\\\\\leftrightarrow\\;\\epsilon\_i^{(\\ell)(g)}+\\frac{u\_i^{(\\ell)(g)}}{\\delta}\<\\frac{\\tau}{\\delta}\\\\](https://latex.codecogs.com/png.latex?-%28%5Cepsilon_i%5E%7B%28%5Cell%29%28g%29%7D-e_i%5E%7B%28%5Cell%29%28g%29%7D%29-u_i%5E%7B%28%5Cell%29%28g%29%7D%2F%5Cdelta%2B%5Ctau%2F%5Cdelta%3D0%5C%5Ce_i%3D%5Cepsilon_i%5E%7B%28%5Cell%29%28g%29%7D%2B%5Cfrac%7Bu_i%5E%7B%28%5Cell%29%28g%29%7D%7D%7B%5Cdelta%7D-%5Cfrac%7B%5Ctau%7D%7B%5Cdelta%7D%3E0%5Cquad%5Ctext%7Bby%20hypo%7D%5C%5C%5Cleftrightarrow%5C%3B%5Cepsilon_i%5E%7B%28%5Cell%29%28g%29%7D%2B%5Cfrac%7Bu_i%5E%7B%28%5Cell%29%28g%29%7D%7D%7B%5Cdelta%7D%3C%5Cfrac%7B%5Ctau%7D%7B%5Cdelta%7D%5C%5C
-"-(\\epsilon_i^{(\\ell)(g)}-e_i^{(\\ell)(g)})-u_i^{(\\ell)(g)}/\\delta+\\tau/\\delta=0\\\\e_i=\\epsilon_i^{(\\ell)(g)}+\\frac{u_i^{(\\ell)(g)}}{\\delta}-\\frac{\\tau}{\\delta}\>0\\quad\\text{by hypo}\\\\\\leftrightarrow\\;\\epsilon_i^{(\\ell)(g)}+\\frac{u_i^{(\\ell)(g)}}{\\delta}\<\\frac{\\tau}{\\delta}\\\\")  
+![-(\\epsilon\_i^{(\\ell)(g)}-e\_i^{(\\ell)(g)})-u\_i^{(\\ell)(g)}/\\delta+\\tau/n\\delta=0\\\\e\_i=\\epsilon\_i^{(\\ell)(g)}+\\frac{u\_i^{(\\ell)(g)}}{\\delta}-\\frac{\\tau}{n\\delta}\>0\\quad\\text{by
+hypo}\\\\\\leftrightarrow\\;\\epsilon\_i^{(\\ell)(g)}+\\frac{u\_i^{(\\ell)(g)}}{\\delta}\<\\frac{\\tau}{n\\delta}\\\\](https://latex.codecogs.com/png.latex?-%28%5Cepsilon_i%5E%7B%28%5Cell%29%28g%29%7D-e_i%5E%7B%28%5Cell%29%28g%29%7D%29-u_i%5E%7B%28%5Cell%29%28g%29%7D%2F%5Cdelta%2B%5Ctau%2Fn%5Cdelta%3D0%5C%5Ce_i%3D%5Cepsilon_i%5E%7B%28%5Cell%29%28g%29%7D%2B%5Cfrac%7Bu_i%5E%7B%28%5Cell%29%28g%29%7D%7D%7B%5Cdelta%7D-%5Cfrac%7B%5Ctau%7D%7Bn%5Cdelta%7D%3E0%5Cquad%5Ctext%7Bby%20hypo%7D%5C%5C%5Cleftrightarrow%5C%3B%5Cepsilon_i%5E%7B%28%5Cell%29%28g%29%7D%2B%5Cfrac%7Bu_i%5E%7B%28%5Cell%29%28g%29%7D%7D%7B%5Cdelta%7D%3C%5Cfrac%7B%5Ctau%7D%7Bn%5Cdelta%7D%5C%5C
+"-(\\epsilon_i^{(\\ell)(g)}-e_i^{(\\ell)(g)})-u_i^{(\\ell)(g)}/\\delta+\\tau/n\\delta=0\\\\e_i=\\epsilon_i^{(\\ell)(g)}+\\frac{u_i^{(\\ell)(g)}}{\\delta}-\\frac{\\tau}{n\\delta}\>0\\quad\\text{by hypo}\\\\\\leftrightarrow\\;\\epsilon_i^{(\\ell)(g)}+\\frac{u_i^{(\\ell)(g)}}{\\delta}\<\\frac{\\tau}{n\\delta}\\\\")  
 
 -----
 
@@ -195,24 +195,24 @@ if
 "e_i^{(\\ell)(g)}=0")
 
   
-![-(\\epsilon\_i^{(\\ell)(g)})-u\_i^{(\\ell)(g)}/\\delta+c/\\delta=0\\quad\\text{where
+![-(\\epsilon\_i^{(\\ell)(g)})-u\_i^{(\\ell)(g)}/\\delta+c/n\\delta=0\\quad\\text{where
 }-\\tau\_\\ell\\le
-c\\le1-\\tau\_\\ell](https://latex.codecogs.com/png.latex?-%28%5Cepsilon_i%5E%7B%28%5Cell%29%28g%29%7D%29-u_i%5E%7B%28%5Cell%29%28g%29%7D%2F%5Cdelta%2Bc%2F%5Cdelta%3D0%5Cquad%5Ctext%7Bwhere%20%7D-%5Ctau_%5Cell%5Cle%20c%5Cle1-%5Ctau_%5Cell
-"-(\\epsilon_i^{(\\ell)(g)})-u_i^{(\\ell)(g)}/\\delta+c/\\delta=0\\quad\\text{where }-\\tau_\\ell\\le c\\le1-\\tau_\\ell")  
+c\\le1-\\tau\_\\ell](https://latex.codecogs.com/png.latex?-%28%5Cepsilon_i%5E%7B%28%5Cell%29%28g%29%7D%29-u_i%5E%7B%28%5Cell%29%28g%29%7D%2F%5Cdelta%2Bc%2Fn%5Cdelta%3D0%5Cquad%5Ctext%7Bwhere%20%7D-%5Ctau_%5Cell%5Cle%20c%5Cle1-%5Ctau_%5Cell
+"-(\\epsilon_i^{(\\ell)(g)})-u_i^{(\\ell)(g)}/\\delta+c/n\\delta=0\\quad\\text{where }-\\tau_\\ell\\le c\\le1-\\tau_\\ell")  
 
   
-![\\frac{\\tau\_\\ell-1}{\\delta}\\le-(\\epsilon\_i^{(\\ell)(g)})-\\frac{u\_i^{(\\ell)(g)}}{\\delta}=-\\frac{c}{\\delta}\\le\\frac{\\tau\_\\ell}{\\delta}](https://latex.codecogs.com/png.latex?%5Cfrac%7B%5Ctau_%5Cell-1%7D%7B%5Cdelta%7D%5Cle-%28%5Cepsilon_i%5E%7B%28%5Cell%29%28g%29%7D%29-%5Cfrac%7Bu_i%5E%7B%28%5Cell%29%28g%29%7D%7D%7B%5Cdelta%7D%3D-%5Cfrac%7Bc%7D%7B%5Cdelta%7D%5Cle%5Cfrac%7B%5Ctau_%5Cell%7D%7B%5Cdelta%7D
-"\\frac{\\tau_\\ell-1}{\\delta}\\le-(\\epsilon_i^{(\\ell)(g)})-\\frac{u_i^{(\\ell)(g)}}{\\delta}=-\\frac{c}{\\delta}\\le\\frac{\\tau_\\ell}{\\delta}")  
+![\\frac{\\tau\_\\ell-1}{n\\delta}\\le-(\\epsilon\_i^{(\\ell)(g)})-\\frac{u\_i^{(\\ell)(g)}}{\\delta}=-\\frac{c}{\\delta}\\le\\frac{\\tau\_\\ell}{n\\delta}](https://latex.codecogs.com/png.latex?%5Cfrac%7B%5Ctau_%5Cell-1%7D%7Bn%5Cdelta%7D%5Cle-%28%5Cepsilon_i%5E%7B%28%5Cell%29%28g%29%7D%29-%5Cfrac%7Bu_i%5E%7B%28%5Cell%29%28g%29%7D%7D%7B%5Cdelta%7D%3D-%5Cfrac%7Bc%7D%7B%5Cdelta%7D%5Cle%5Cfrac%7B%5Ctau_%5Cell%7D%7Bn%5Cdelta%7D
+"\\frac{\\tau_\\ell-1}{n\\delta}\\le-(\\epsilon_i^{(\\ell)(g)})-\\frac{u_i^{(\\ell)(g)}}{\\delta}=-\\frac{c}{\\delta}\\le\\frac{\\tau_\\ell}{n\\delta}")  
 
 -----
 
   
 ![\\therefore
-e\_i^{(\\ell)(g)^{k+1}}=\\begin{cases}\\epsilon\_i^{(\\ell)(g)}+u\_i^{(\\ell)(g)}/\\delta-(\\tau\_\\ell-1)/\\delta&\\text{if
-}\\epsilon\_i^{(\\ell)(g)}+u\_i^{(\\ell)(g)}/\\delta\<(\\tau\_\\ell-1)/\\delta\\\\0\\quad&\\text{if
-}(\\tau\_\\ell-1)/\\delta\<\\epsilon\_i^{(\\ell)(g)}+u\_i^{(\\ell)(g)}/\\delta\<\\tau\_\\ell/\\delta\\\\\\epsilon\_i^{(\\ell)(g)}+u\_i^{(\\ell)(g)}/\\delta-\\tau\_\\ell/\\delta\\quad&\\text{if
-}\\epsilon\_i^{(\\ell)(g)}+u\_i^{(\\ell)(g)}/\\delta\>\\tau\_\\ell/\\delta\\end{cases}](https://latex.codecogs.com/png.latex?%5Ctherefore%20e_i%5E%7B%28%5Cell%29%28g%29%5E%7Bk%2B1%7D%7D%3D%5Cbegin%7Bcases%7D%5Cepsilon_i%5E%7B%28%5Cell%29%28g%29%7D%2Bu_i%5E%7B%28%5Cell%29%28g%29%7D%2F%5Cdelta-%28%5Ctau_%5Cell-1%29%2F%5Cdelta%26%5Ctext%7Bif%20%7D%5Cepsilon_i%5E%7B%28%5Cell%29%28g%29%7D%2Bu_i%5E%7B%28%5Cell%29%28g%29%7D%2F%5Cdelta%3C%28%5Ctau_%5Cell-1%29%2F%5Cdelta%5C%5C0%5Cquad%26%5Ctext%7Bif%20%7D%28%5Ctau_%5Cell-1%29%2F%5Cdelta%3C%5Cepsilon_i%5E%7B%28%5Cell%29%28g%29%7D%2Bu_i%5E%7B%28%5Cell%29%28g%29%7D%2F%5Cdelta%3C%5Ctau_%5Cell%2F%5Cdelta%5C%5C%5Cepsilon_i%5E%7B%28%5Cell%29%28g%29%7D%2Bu_i%5E%7B%28%5Cell%29%28g%29%7D%2F%5Cdelta-%5Ctau_%5Cell%2F%5Cdelta%5Cquad%26%5Ctext%7Bif%20%7D%5Cepsilon_i%5E%7B%28%5Cell%29%28g%29%7D%2Bu_i%5E%7B%28%5Cell%29%28g%29%7D%2F%5Cdelta%3E%5Ctau_%5Cell%2F%5Cdelta%5Cend%7Bcases%7D
-"\\therefore e_i^{(\\ell)(g)^{k+1}}=\\begin{cases}\\epsilon_i^{(\\ell)(g)}+u_i^{(\\ell)(g)}/\\delta-(\\tau_\\ell-1)/\\delta&\\text{if }\\epsilon_i^{(\\ell)(g)}+u_i^{(\\ell)(g)}/\\delta\<(\\tau_\\ell-1)/\\delta\\\\0\\quad&\\text{if }(\\tau_\\ell-1)/\\delta\<\\epsilon_i^{(\\ell)(g)}+u_i^{(\\ell)(g)}/\\delta\<\\tau_\\ell/\\delta\\\\\\epsilon_i^{(\\ell)(g)}+u_i^{(\\ell)(g)}/\\delta-\\tau_\\ell/\\delta\\quad&\\text{if }\\epsilon_i^{(\\ell)(g)}+u_i^{(\\ell)(g)}/\\delta\>\\tau_\\ell/\\delta\\end{cases}")  
+e\_i^{(\\ell)(g)^{k+1}}=\\begin{cases}\\epsilon\_i^{(\\ell)(g)}+u\_i^{(\\ell)(g)}/\\delta-(\\tau\_\\ell-1)/n\\delta&\\text{if
+}\\epsilon\_i^{(\\ell)(g)}+u\_i^{(\\ell)(g)}/\\delta\<(\\tau\_\\ell-1)/n\\delta\\\\0\\quad&\\text{if
+}(\\tau\_\\ell-1)/n\\delta\<\\epsilon\_i^{(\\ell)(g)}+u\_i^{(\\ell)(g)}/\\delta\<\\tau\_\\ell/n\\delta\\\\\\epsilon\_i^{(\\ell)(g)}+u\_i^{(\\ell)(g)}/\\delta-\\tau\_\\ell/n\\delta\\quad&\\text{if
+}\\epsilon\_i^{(\\ell)(g)}+u\_i^{(\\ell)(g)}/\\delta\>\\tau\_\\ell/n\\delta\\end{cases}](https://latex.codecogs.com/png.latex?%5Ctherefore%20e_i%5E%7B%28%5Cell%29%28g%29%5E%7Bk%2B1%7D%7D%3D%5Cbegin%7Bcases%7D%5Cepsilon_i%5E%7B%28%5Cell%29%28g%29%7D%2Bu_i%5E%7B%28%5Cell%29%28g%29%7D%2F%5Cdelta-%28%5Ctau_%5Cell-1%29%2Fn%5Cdelta%26%5Ctext%7Bif%20%7D%5Cepsilon_i%5E%7B%28%5Cell%29%28g%29%7D%2Bu_i%5E%7B%28%5Cell%29%28g%29%7D%2F%5Cdelta%3C%28%5Ctau_%5Cell-1%29%2Fn%5Cdelta%5C%5C0%5Cquad%26%5Ctext%7Bif%20%7D%28%5Ctau_%5Cell-1%29%2Fn%5Cdelta%3C%5Cepsilon_i%5E%7B%28%5Cell%29%28g%29%7D%2Bu_i%5E%7B%28%5Cell%29%28g%29%7D%2F%5Cdelta%3C%5Ctau_%5Cell%2Fn%5Cdelta%5C%5C%5Cepsilon_i%5E%7B%28%5Cell%29%28g%29%7D%2Bu_i%5E%7B%28%5Cell%29%28g%29%7D%2F%5Cdelta-%5Ctau_%5Cell%2Fn%5Cdelta%5Cquad%26%5Ctext%7Bif%20%7D%5Cepsilon_i%5E%7B%28%5Cell%29%28g%29%7D%2Bu_i%5E%7B%28%5Cell%29%28g%29%7D%2F%5Cdelta%3E%5Ctau_%5Cell%2Fn%5Cdelta%5Cend%7Bcases%7D
+"\\therefore e_i^{(\\ell)(g)^{k+1}}=\\begin{cases}\\epsilon_i^{(\\ell)(g)}+u_i^{(\\ell)(g)}/\\delta-(\\tau_\\ell-1)/n\\delta&\\text{if }\\epsilon_i^{(\\ell)(g)}+u_i^{(\\ell)(g)}/\\delta\<(\\tau_\\ell-1)/n\\delta\\\\0\\quad&\\text{if }(\\tau_\\ell-1)/n\\delta\<\\epsilon_i^{(\\ell)(g)}+u_i^{(\\ell)(g)}/\\delta\<\\tau_\\ell/n\\delta\\\\\\epsilon_i^{(\\ell)(g)}+u_i^{(\\ell)(g)}/\\delta-\\tau_\\ell/n\\delta\\quad&\\text{if }\\epsilon_i^{(\\ell)(g)}+u_i^{(\\ell)(g)}/\\delta\>\\tau_\\ell/n\\delta\\end{cases}")  
 
 ## 5\. Closed form for multipliers
 
