@@ -34,8 +34,8 @@ N(0, 0.1^2)\\end{aligned}](https://latex.codecogs.com/png.latex?%5Cbegin%7Balign
   - m : \# of group.
   - p : \# of covariate.
   - r : nonzero entry in true
-    ![B(\\tau)](https://latex.codecogs.com/png.latex?B%28%5Ctau%29
-    "B(\\tau)")
+    ![\\Gamma(\\tau)](https://latex.codecogs.com/png.latex?%5CGamma%28%5Ctau%29
+    "\\Gamma(\\tau)")
   - K : \# of basis function.
   - b : \# of regional quantiel we consider.
 
@@ -44,14 +44,14 @@ For toy example, I will use n = 300, p = 50, g = 20.
 ``` r
 set.seed(0)
 n <- 300
-m <- 20
-p <- 50
-r <- 500
-b <- 21
+m <- 15
+p <- 20
+num_nz <- round((p+1)*m*(2/3)) 
+b <- 6
 num_rank <- 5
 
 X <- matrix(rnorm(n*p, mean = 0, sd = 1), nrow = n) %>% cbind(1, .)   #add intercept term in X
-sp_mat <- rsparsematrix(nrow = p+1, ncol = m, nnz = r)             # make sparse matrix
+sp_mat <- rsparsematrix(nrow = p+1, ncol = m, nnz = num_nz)             # make sparse matrix
 LR_mat <- matrix(rnorm(m*(p+1), mean = 0, sd = 1), ncol = m)      # make low rank matrix using SVD
 SVD <- svd(LR_mat)
 D_mat <- diag(SVD$d)
@@ -68,15 +68,6 @@ Y <- X%*%true_B + eps
 
 ![B(\\tau)](https://latex.codecogs.com/png.latex?B%28%5Ctau%29
 "B(\\tau)") = sparse matrix + low rank matrix
-
-#### Question
-
-1.  Y를 generate할 때, 사용하는
-    ![B(\\tau)](https://latex.codecogs.com/png.latex?B%28%5Ctau%29
-    "B(\\tau)") 값에 tau depend?
-2.  우선 ![\\tau
-    = 0.5](https://latex.codecogs.com/png.latex?%5Ctau%20%3D%200.5
-    "\\tau = 0.5") 로 generate 시켰는데, 이렇게 하는게 맞나?
 
 # 1\. Preliminary
 
@@ -101,7 +92,14 @@ K <- 15
 
 tau_seq <- seq(from = 0.4, to = 0.6, length.out = b) 
 Phi <- bs(tau_seq, df = K, degree = 3, intercept = TRUE)
+
+attr(Phi, "knots")
 ```
+
+    ## 8.333333% 16.66667%       25% 33.33333% 41.66667%       50% 58.33333% 66.66667% 
+    ## 0.4166667 0.4333333 0.4500000 0.4666667 0.4833333 0.5000000 0.5166667 0.5333333 
+    ##       75% 83.33333% 91.66667% 
+    ## 0.5500000 0.5666667 0.5833333
 
   
 ![\\begin{aligned}\\boldsymbol{v}\_i^{(\\ell)} &= (\\boldsymbol{x}\_i
@@ -152,7 +150,7 @@ for(l in 1:b){
 "\\boldsymbol{\\eta}^{(g)}, \\boldsymbol{\\theta}^{(g)}, \\boldsymbol{w}^{(g)}\\in \\mathbb{R}^{(p+1)\\times K}\\\\ \\boldsymbol{\\alpha}^{(g)} \\in \\mathbb{R}^{p+1} \\\\ \\boldsymbol{e}^{(\\ell)(g)}, \\boldsymbol{u}^{(\\ell)(g)}, \\in \\mathbb{R}^{n}\\\\subject\\; to \\; \\boldsymbol{\\eta}^{(g)} - \\boldsymbol{\\theta}^{(g)} = 0, \\; and \\;\\boldsymbol{Y}^{(g)} - \\boldsymbol{X}\\boldsymbol{\\alpha}^{(g)} - \\boldsymbol{V}^{(\\ell)}\\boldsymbol{\\eta}^{(g)} - \\boldsymbol{e}^{(\\ell)(g)} = 0")  
 
 ``` r
-eta_old <- matrix(0, nrow = (p+1)*K, ncol = m) 
+eta_old <- matrix(1, nrow = (p+1)*K, ncol = m) 
 theta_old <- eta_old
 alpha_old <- matrix(0, nrow = p+1, ncol = m)
 Z_old <- X %*% alpha_old
@@ -170,11 +168,11 @@ w_old <- matrix(0, nrow = (p+1)*K, ncol = m)
 "\\begin{aligned}\\boldsymbol{Y}&=\\boldsymbol{XA}+\\boldsymbol{X\\Gamma}(\\tau)\\\\&=\\boldsymbol{Z}+\\boldsymbol{V}_{\\tau_\\ell}\\boldsymbol{\\Theta}\\end{aligned}")  
 
 ``` r
-max_iter <- 50
-delta <- 5
-lambda_1 <- 15          #low rank penalty
-lambda_2 <- 28           #sparse penalty
-tol_error <- 10
+max_iter <- 100
+delta <- 0.25
+lambda_1 <- 0.1          #low rank penalty
+lambda_2 <- 2           #sparse penalty
+tol_error <- 5
 iter_error <- matrix(ncol = 6, nrow = max_iter) %>%
   `colnames<-`(value = c("eta", "theta", "alpha", "e", "u", "w"))
 
@@ -193,7 +191,6 @@ for(iter in 1:max_iter){
   
   # Process for theta
   theta_new <- matrix(nrow = (p+1)*K, ncol = m)
-  threshold <- lambda_2/delta
   for (g in 1:m) {
     r_g <- eta_new[, g] - w_old[, g]/delta
     value <- 1 - (lambda_2/(delta * abs(r_g)))
@@ -217,9 +214,9 @@ for(iter in 1:max_iter){
     for(g in 1:m) {
      error <- Y[, g] - Z_new[, g] - V[[l]] %*% eta_new[, g]   #error = Y - XA - VH
      value <- error + u_old[[l]][, g]/delta
-     e_new[[l]][, g] <- case_when(value > tau_seq[l]/delta ~ value - tau_seq[l]/delta, 
-                                  value < (tau_seq[l]-1)/delta ~ value - (tau_seq[l]-1)/delta, 
-                                  value >=(tau_seq[l]-1)/delta & value <= tau_seq[l]/delta ~ 0)
+     e_new[[l]][, g] <- case_when(value > tau_seq[l]/(n*delta) ~ value - tau_seq[l]/(n*delta), 
+                                  value < (tau_seq[l]-1)/(n*delta) ~ value - (tau_seq[l]-1)/(n*delta), 
+                                  value >=(tau_seq[l]-1)/(n*delta) & value <= tau_seq[l]/(n*delta) ~ 0)
     }
   }
   
@@ -241,7 +238,7 @@ for(iter in 1:max_iter){
   iter_error[iter, "u"] <- lapply(u_diff, FUN = function(x) Matrix::norm(x, type = "F")) %>% Reduce("+", .)
   iter_error[iter, "w"] <- Matrix::norm(w_old - w_new, type = "F")
   
-  #if(iter_error[iter, ] < tol_error) break
+  if(sum(iter_error[iter, ]) < tol_error) break
   
   eta_old <- eta_new
   theta_old <- theta_new
@@ -262,7 +259,7 @@ for(iter in 1:max_iter){
 ``` r
 iter_error %>% data.frame %>%
   mutate(iter = 1:nrow(.)) %>%
-  filter(iter %in% 15:50) %>% 
+  filter(iter > 15) %>% 
   gather(key = "estimator", value = "value", -iter) %>%
   ggplot() +
   geom_line(aes(x = iter, y = value, group = estimator, color = estimator)) +
@@ -305,154 +302,86 @@ sing_val <- svd(alpha_new)$d
 sum(sing_val[1:5])/sum(sing_val)
 ```
 
-    ## [1] 0.4385151
-
-  
-![||A-\\hat{A}||\_F](https://latex.codecogs.com/png.latex?%7C%7CA-%5Chat%7BA%7D%7C%7C_F
-"||A-\\hat{A}||_F")  
+    ## [1] 0.9771025
 
 ``` r
-(LR_mat - alpha_new) %>%
-  Matrix::norm(type = "F")
+rankMatrix(alpha_new)
 ```
 
-    ## [1] 44.15708
+    ## [1] 12
+    ## attr(,"method")
+    ## [1] "tolNorm2"
+    ## attr(,"useGrad")
+    ## [1] FALSE
+    ## attr(,"tol")
+    ## [1] 4.662937e-15
 
 ### Sparse matrix
 
-  
-![||V\_{\\tau\_\\ell}\\hat{\\Theta}-X\\Gamma(\\tau)||\_F](https://latex.codecogs.com/png.latex?%7C%7CV_%7B%5Ctau_%5Cell%7D%5Chat%7B%5CTheta%7D-X%5CGamma%28%5Ctau%29%7C%7C_F
-"||V_{\\tau_\\ell}\\hat{\\Theta}-X\\Gamma(\\tau)||_F")  
+![\\hat{\\Gamma}(\\tau)=V\_{\\tau\_\\ell}\\hat{\\Theta}](https://latex.codecogs.com/png.latex?%5Chat%7B%5CGamma%7D%28%5Ctau%29%3DV_%7B%5Ctau_%5Cell%7D%5Chat%7B%5CTheta%7D
+"\\hat{\\Gamma}(\\tau)=V_{\\tau_\\ell}\\hat{\\Theta}")
 
 ``` r
-lapply(V, FUN = function(x) ((x %*% theta_new) - X %*% sp_mat) %>% Matrix::norm(type = "F")) %>%
-  `names<-`(value = tau_seq) %>%
-  bind_cols %>% t() 
+gamma_tau_hat <- list()
+for(l in 1:b) {
+  phi_tau <- Phi[l, ]
+  gamma_tau_hat[[l]] <- matrix(nrow = (p+1), ncol = m)
+  for(i in 1:(p+1)) {
+    for(j in 1:m) {
+      theta_j_g <- theta_new[(1+(i-1)*15):(15*i), g]
+      gamma_tau_hat[[l]][i, j] <- theta_j_g %*% phi_tau
+    }
+  }
+}
 ```
-
-    ##          [,1]
-    ## 0.4  325.6633
-    ## 0.41 343.5448
-    ## 0.42 309.8238
-    ## 0.43 299.9283
-    ## 0.44 300.1387
-    ## 0.45 302.5406
-    ## 0.46 302.0807
-    ## 0.47 301.2192
-    ## 0.48 301.8234
-    ## 0.49 301.8836
-    ## 0.5  301.6634
-    ## 0.51 302.4676
-    ## 0.52 302.9132
-    ## 0.53 302.7039
-    ## 0.54 303.9290
-    ## 0.55 304.7996
-    ## 0.56 302.9462
-    ## 0.57 303.3842
-    ## 0.58 313.3453
-    ## 0.59 345.5079
-    ## 0.6  329.1110
-
-![X\\hat{\\Gamma}(\\tau)=V\_{\\tau\_\\ell}\\hat{\\Theta}](https://latex.codecogs.com/png.latex?X%5Chat%7B%5CGamma%7D%28%5Ctau%29%3DV_%7B%5Ctau_%5Cell%7D%5Chat%7B%5CTheta%7D
-"X\\hat{\\Gamma}(\\tau)=V_{\\tau_\\ell}\\hat{\\Theta}")
-
-![\\hat{\\Gamma}(\\tau)=(X^TX)^{-1}X^TV\_{\\tau\_\\ell}\\hat{\\Theta}](https://latex.codecogs.com/png.latex?%5Chat%7B%5CGamma%7D%28%5Ctau%29%3D%28X%5ETX%29%5E%7B-1%7DX%5ETV_%7B%5Ctau_%5Cell%7D%5Chat%7B%5CTheta%7D
-"\\hat{\\Gamma}(\\tau)=(X^TX)^{-1}X^TV_{\\tau_\\ell}\\hat{\\Theta}")
-
-``` r
-gamma_tau_hat <- lapply(V, FUN = function(x) solve(t(X) %*% X) %*% t(X) %*% x %*% theta_new) %>%
-  `names<-`(value = tau_seq)
-lapply(gamma_tau_hat, FUN = function(x) (x - sp_mat) %>% Matrix::norm(type = "F")) %>%
-  bind_cols %>% t()
-```
-
-    ##          [,1]
-    ## 0.4  19.36359
-    ## 0.41 20.31675
-    ## 0.42 18.36523
-    ## 0.43 17.67847
-    ## 0.44 17.66829
-    ## 0.45 17.83623
-    ## 0.46 17.79435
-    ## 0.47 17.72865
-    ## 0.48 17.77671
-    ## 0.49 17.77540
-    ## 0.5  17.74744
-    ## 0.51 17.79991
-    ## 0.52 17.82164
-    ## 0.53 17.78757
-    ## 0.54 17.86407
-    ## 0.55 17.91877
-    ## 0.56 17.77074
-    ## 0.57 17.80109
-    ## 0.58 18.48764
-    ## 0.59 20.38757
-    ## 0.6  19.47473
 
 ![\\\#\\text{ of non-zero entry in
 }\\Gamma(\\tau)=500](https://latex.codecogs.com/png.latex?%5C%23%5Ctext%7B%20of%20non-zero%20entry%20in%20%7D%5CGamma%28%5Ctau%29%3D500
 "\\#\\text{ of non-zero entry in }\\Gamma(\\tau)=500")
 
-![x\<0.1^5](https://latex.codecogs.com/png.latex?x%3C0.1%5E5
-"x\<0.1^5")이면 0으로 간주.
-
 ### sparsity pattern check
 
-  
-![\\begin{aligned}\\text{common}&:=\\text{zero index in
-}\\Gamma(\\tau)=\\text{zero index in
-}\\hat{\\Gamma}(\\tau)\\\\\\text{diff}&:=\\text{zero index in
-}\\Gamma(\\tau)\\ne\\text{zero index in
-}\\hat{\\Gamma}(\\tau)\\\\\\end{aligned}](https://latex.codecogs.com/png.latex?%5Cbegin%7Baligned%7D%5Ctext%7Bcommon%7D%26%3A%3D%5Ctext%7Bzero%20index%20in%20%7D%5CGamma%28%5Ctau%29%3D%5Ctext%7Bzero%20index%20in%20%7D%5Chat%7B%5CGamma%7D%28%5Ctau%29%5C%5C%5Ctext%7Bdiff%7D%26%3A%3D%5Ctext%7Bzero%20index%20in%20%7D%5CGamma%28%5Ctau%29%5Cne%5Ctext%7Bzero%20index%20in%20%7D%5Chat%7B%5CGamma%7D%28%5Ctau%29%5C%5C%5Cend%7Baligned%7D
-"\\begin{aligned}\\text{common}&:=\\text{zero index in }\\Gamma(\\tau)=\\text{zero index in }\\hat{\\Gamma}(\\tau)\\\\\\text{diff}&:=\\text{zero index in }\\Gamma(\\tau)\\ne\\text{zero index in }\\hat{\\Gamma}(\\tau)\\\\\\end{aligned}")  
+``` r
+data.frame(c("TP", "FP"), c("FN", "TN")) %>% 
+  `rownames<-`(value = c("True:non_zero", "True:zero")) %>%
+  `colnames<-`(value = c("Est:non_zero", "Est:zero")) %>% pander
+```
+
+|                    | Est:non\_zero | Est:zero |
+| :----------------: | :-----------: | :------: |
+| **True:non\_zero** |      TP       |    FN    |
+|   **True:zero**    |      FP       |    TN    |
 
 ``` r
 num_zero <- which(sp_mat==0, arr.ind = TRUE) %>% nrow
 print(paste0("The number of zero entry in sp_mat is ", num_zero))
 ```
 
-    ## [1] "The number of zero entry in sp_mat is 520"
+    ## [1] "The number of zero entry in sp_mat is 105"
 
 ``` r
-check_sp_pattern <- function(true, est, tol = 0.1^5, idx = FALSE) {
-  # diff1 means that true = 0 but est != 0
-  # diff2 means that true != 0 but est = 0
+check_sp_pattern <- function(true, est, tol = 0.1^5, idx = FALSE, nnz = num_nz) {
   zero_idx_true <- which(abs(true) < tol, arr.ind = TRUE) %>% as_tibble
   zero_idx_est <- which(abs(est) < tol, arr.ind = TRUE) %>% as_tibble
-  common <- semi_join(zero_idx_true, zero_idx_est, by = c("row", "col"))
-  diff_1 <- anti_join(zero_idx_true, zero_idx_est, by = c("row", "col"))
-  diff_2 <- anti_join(zero_idx_est, zero_idx_true, by = c("row", "col"))
-  if(idx == FALSE) {return(data.frame(diff1 = nrow(diff_1), common = nrow(common), diff2 = nrow(diff_2)))
-    } else {return(list(common = common, diff = diff))}
+  TN <- semi_join(zero_idx_true, zero_idx_est, by = c("row", "col"))
+  FP <- anti_join(zero_idx_true, zero_idx_est, by = c("row", "col"))
+  FN <- anti_join(zero_idx_est, zero_idx_true, by = c("row", "col"))
+  if(idx == FALSE) {return(data.frame(Positive = c(nnz - nrow(FN), nrow(FP)), Negative = c(nrow(FN), nrow(TN))) %>%
+                             `rownames<-`(value = c("Positive", "Negative")))
+    } else {return(list(TN = TN, FP = FP, FN = FN))}
 }
 ```
 
 ``` r
-gamma_tau_hat %>%
-  lapply(FUN = function(x) check_sp_pattern(true = sp_mat, est = x)) %>%
-  bind_rows(.id = "tau") %>%
-  mutate(accuracy = common/num_zero)
-```
+ROC_table <- list()
+tol_error_seq <- c(seq(from = 0, to = 1, by = 0.05))
+for(idx in 1:length(tol_error_seq)) {
+  ROC_table[[idx]] <- check_sp_pattern(true = sp_mat, est = gamma_tau_hat[[1]], tol = tol_error_seq[[idx]])
+}
 
-    ##     tau diff1 common diff2  accuracy
-    ## 1   0.4   133    387   262 0.7442308
-    ## 2  0.41   226    294   188 0.5653846
-    ## 3  0.42   225    295   188 0.5673077
-    ## 4  0.43   226    294   188 0.5653846
-    ## 5  0.44   226    294   187 0.5653846
-    ## 6  0.45   226    294   188 0.5653846
-    ## 7  0.46   227    293   188 0.5634615
-    ## 8  0.47   205    315   195 0.6057692
-    ## 9  0.48   205    315   196 0.6057692
-    ## 10 0.49   205    315   195 0.6057692
-    ## 11  0.5   203    317   198 0.6096154
-    ## 12 0.51   205    315   196 0.6057692
-    ## 13 0.52   207    313   196 0.6019231
-    ## 14 0.53   207    313   196 0.6019231
-    ## 15 0.54   221    299   189 0.5750000
-    ## 16 0.55   220    300   189 0.5769231
-    ## 17 0.56   221    299   189 0.5750000
-    ## 18 0.57   221    299   189 0.5750000
-    ## 19 0.58   220    300   189 0.5769231
-    ## 20 0.59   221    299   189 0.5750000
-    ## 21  0.6   137    383   265 0.7365385
+ROC_table %>%
+  lapply(FUN = function(x) data.frame(FP_rate = x[2, 1]/num_zero, TP_rate = x[1, 1]/num_nz)) %>%
+  bind_rows %>%
+  ggplot() +
+  geom_line(aes(x = FP_rate, y = TP_rate))
+```
