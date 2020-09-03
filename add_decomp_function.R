@@ -3,6 +3,17 @@ add_decomp <- function(delta, lambda_1, lambda_2, tol_error, max_iter) {
   # lambda_1 = low rank penalty
   # lambda_2 = sparse penalty
   
+  # initial value
+  eta_old <- matrix(1, nrow = (p+1)*K, ncol = m) 
+  theta_old <- eta_old
+  alpha_old <- matrix(0, nrow = p+1, ncol = m)
+  Z_old <- X %*% alpha_old
+  e_old <- list()
+  for(l in 1:b) {e_old[[l]] <- Y - Z_old - V[[l]] %*% eta_old}
+  u_old <- list()
+  for(l in 1:b) {u_old[[l]] <- matrix(0, nrow = n, ncol = m)}
+  w_old <- matrix(0, nrow = (p+1)*K, ncol = m)
+  
   iter_error <- matrix(ncol = 6, nrow = max_iter) %>%
     `colnames<-`(value = c("eta", "theta", "alpha", "e", "u", "w"))
   
