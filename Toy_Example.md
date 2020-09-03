@@ -46,7 +46,7 @@ set.seed(0)
 n <- 300
 m <- 15
 p <- 20
-num_nz <- round((p+1)*m*(2/3)) 
+num_nz <- round((p+1)*m*(1/3)) 
 b <- 6
 num_rank <- 5
 
@@ -168,88 +168,107 @@ w_old <- matrix(0, nrow = (p+1)*K, ncol = m)
 "\\begin{aligned}\\boldsymbol{Y}&=\\boldsymbol{XA}+\\boldsymbol{X\\Gamma}(\\tau)\\\\&=\\boldsymbol{Z}+\\boldsymbol{V}_{\\tau_\\ell}\\boldsymbol{\\Theta}\\end{aligned}")  
 
 ``` r
-max_iter <- 100
-delta <- 0.25
-lambda_1 <- 0.1          #low rank penalty
-lambda_2 <- 2           #sparse penalty
-tol_error <- 5
-iter_error <- matrix(ncol = 6, nrow = max_iter) %>%
-  `colnames<-`(value = c("eta", "theta", "alpha", "e", "u", "w"))
-
-sum_V <- Reduce("+", V)
-VV_prod <- lapply(V, FUN = function(x) t(x) %*% x)   # V^TV
-sum_VV <- Reduce("+", VV_prod)
-
-for(iter in 1:max_iter){
-  # Process for eta
-  eta_new <- matrix(nrow = (p+1)*K, ncol = m)
-  Vu_prod <- mapply(function(x,y) t(x) %*% y, V, u_old, SIMPLIFY = FALSE)
-  Ve_prod <- mapply(function(x,y) t(x) %*% y, V, e_old, SIMPLIFY = FALSE)
-  eta_new <- (solve(sum_VV+diag(1, (p+1)*K))/delta) %*% (w_old + delta * theta_old + Reduce("+", Vu_prod)
-                                                         + delta * t(sum_V) %*% (Y - Z_old)
-                                                         - delta * Reduce("+", Ve_prod))
+add_decomp <- function(delta, lambda_1, lambda_2, tol_error, max_iter) {
+  # delta = step size
+  # lambda_1 = low rank penalty
+  # lambda_2 = sparse penalty
   
-  # Process for theta
-  theta_new <- matrix(nrow = (p+1)*K, ncol = m)
-  for (g in 1:m) {
-    r_g <- eta_new[, g] - w_old[, g]/delta
-    value <- 1 - (lambda_2/(delta * abs(r_g)))
-    theta_new[, g] <- ifelse(value > 0, value * r_g, 0)
-  }
-  # Process for Z=XA
-  Y_list <- list()
-  for(i in 1:l) {Y_list[[i]] <- Y}
-  VH_list <- lapply(V, FUN = function(x) x %*% eta_new)
-  obj_list <- mapply(function(Y, VH, E, U) Y - VH - E - U/delta, Y_list, VH_list, e_old, u_old, SIMPLIFY = FALSE)
-  obj <- Reduce("+", obj_list)/b 
-  SVD <- svd(obj)
-  new_singular <- sapply(SVD$d - lambda_1/(delta*b), FUN = function(x) max(x, 0))
-  Z_new <- SVD$u %*% diag(new_singular) %*% t(SVD$v)
-  alpha_new <- solve(t(X) %*% X) %*% t(X) %*% Z_new
+  iter_error <- matrix(ncol = 6, nrow = max_iter) %>%
+    `colnames<-`(value = c("eta", "theta", "alpha", "e", "u", "w"))
   
-  # Process for e
-  e_new <- list()
-  for(l in 1:b){
-    e_new[[l]] <- matrix(nrow = n, ncol = m)
-    for(g in 1:m) {
-     error <- Y[, g] - Z_new[, g] - V[[l]] %*% eta_new[, g]   #error = Y - XA - VH
-     value <- error + u_old[[l]][, g]/delta
-     e_new[[l]][, g] <- case_when(value > tau_seq[l]/(n*delta) ~ value - tau_seq[l]/(n*delta), 
-                                  value < (tau_seq[l]-1)/(n*delta) ~ value - (tau_seq[l]-1)/(n*delta), 
-                                  value >=(tau_seq[l]-1)/(n*delta) & value <= tau_seq[l]/(n*delta) ~ 0)
+  sum_V <- Reduce("+", V)
+  VV_prod <- lapply(V, FUN = function(x) t(x) %*% x)   # V^TV
+  sum_VV <- Reduce("+", VV_prod)
+  
+  for(iter in 1:max_iter) {
+    # Process for eta
+    eta_new <- matrix(nrow = (p+1)*K, ncol = m)
+    Vu_prod <- mapply(function(x,y) t(x) %*% y, V, u_old, SIMPLIFY = FALSE)
+    Ve_prod <- mapply(function(x,y) t(x) %*% y, V, e_old, SIMPLIFY = FALSE)
+    eta_new <- (solve(sum_VV+diag(1, (p+1)*K))/delta) %*% (w_old + delta * theta_old + Reduce("+", Vu_prod)
+                                                           + delta * t(sum_V) %*% (Y - Z_old)
+                                                           - delta * Reduce("+", Ve_prod))
+    
+    # Process for theta
+    theta_new <- matrix(nrow = (p+1)*K, ncol = m)
+    for (g in 1:m) {
+      r_g <- eta_new[, g] - w_old[, g]/delta
+      value <- 1 - (lambda_2/(delta * abs(r_g)))
+      theta_new[, g] <- ifelse(value > 0, value * r_g, 0)
     }
+    
+    # Process for Z=XA
+    Y_list <- list()
+    for(i in 1:l) {Y_list[[i]] <- Y}
+    VH_list <- lapply(V, FUN = function(x) x %*% eta_new)
+    obj_list <- mapply(function(Y, VH, E, U) Y - VH - E - U/delta, Y_list, VH_list, e_old, u_old, SIMPLIFY = FALSE)
+    obj <- Reduce("+", obj_list)/b 
+    SVD <- svd(obj)
+    new_singular <- sapply(SVD$d - lambda_1/(delta*b), FUN = function(x) max(x, 0))
+    Z_new <- SVD$u %*% diag(new_singular) %*% t(SVD$v)
+    alpha_new <- solve(t(X) %*% X) %*% t(X) %*% Z_new
+    
+    # Process for e
+    e_new <- list()
+    for(l in 1:b){
+      e_new[[l]] <- matrix(nrow = n, ncol = m)
+      for(g in 1:m) {
+        error <- Y[, g] - Z_new[, g] - V[[l]] %*% eta_new[, g]   #error = Y - XA - VH
+        value <- error + u_old[[l]][, g]/delta
+        e_new[[l]][, g] <- case_when(value > tau_seq[l]/(n*delta) ~ value - tau_seq[l]/(n*delta), 
+                                     value < (tau_seq[l]-1)/(n*delta) ~ value - (tau_seq[l]-1)/(n*delta), 
+                                     value >=(tau_seq[l]-1)/(n*delta) & value <= tau_seq[l]/(n*delta) ~ 0)
+      }
+    }
+    
+    # Process for multiplier u
+    u_new <- list()
+    for(l in 1:b) {
+      u_new[[l]] <- u_old[[l]] + delta * (Y - Z_new - V[[l]] %*% eta_new - e_new[[l]])
+    }
+    
+    # Process for multiplier w
+    w_new <- w_old + delta * (theta_new - eta_new)
+    
+    # Update iteration error
+    iter_error[iter, "eta"] <- Matrix::norm(eta_old - eta_new, type = "F")
+    iter_error[iter, "theta"] <- Matrix::norm(theta_old - theta_new, type = "F")
+    iter_error[iter, "alpha"] <- Matrix::norm(alpha_old - alpha_new, type = "F")
+    e_diff <- mapply(FUN = function(old, new) old - new, e_old, e_new, SIMPLIFY = FALSE)  # sum of frobenius norm
+    iter_error[iter, "e"] <- lapply(e_diff, FUN = function(x) Matrix::norm(x, type = "F")) %>% Reduce("+", .)
+    u_diff <- mapply(FUN = function(old, new) old - new, u_old, u_new, SIMPLIFY = FALSE)
+    iter_error[iter, "u"] <- lapply(u_diff, FUN = function(x) Matrix::norm(x, type = "F")) %>% Reduce("+", .)
+    iter_error[iter, "w"] <- Matrix::norm(w_old - w_new, type = "F")
+    
+    if(sum(iter_error[iter, ]) < tol_error) break
+    
+    eta_old <- eta_new
+    theta_old <- theta_new
+    Z_old <- Z_new
+    alpha_old <- alpha_new
+    e_old <- e_new
+    u_old <- u_new
+    w_old <- w_new
   }
   
-  # Process for multiplier u
-  u_new <- list()
-  for(l in 1:b) {
-    u_new[[l]] <- u_old[[l]] + delta * (Y - Z_new - V[[l]] %*% eta_new - e_new[[l]])
-  }
-  # Process for multiplier w
-  w_new <- w_old + delta * (theta_new - eta_new)
-  
-  # Update iteration error
-  iter_error[iter, "eta"] <- Matrix::norm(eta_old - eta_new, type = "F")
-  iter_error[iter, "theta"] <- Matrix::norm(theta_old - theta_new, type = "F")
-  iter_error[iter, "alpha"] <- Matrix::norm(alpha_old - alpha_new, type = "F")
-  e_diff <- mapply(FUN = function(old, new) old - new, e_old, e_new, SIMPLIFY = FALSE)  # sum of frobenius norm
-  iter_error[iter, "e"] <- lapply(e_diff, FUN = function(x) Matrix::norm(x, type = "F")) %>% Reduce("+", .)
-  u_diff <- mapply(FUN = function(old, new) old - new, u_old, u_new, SIMPLIFY = FALSE)
-  iter_error[iter, "u"] <- lapply(u_diff, FUN = function(x) Matrix::norm(x, type = "F")) %>% Reduce("+", .)
-  iter_error[iter, "w"] <- Matrix::norm(w_old - w_new, type = "F")
-  
-  if(sum(iter_error[iter, ]) < tol_error) break
-  
-  eta_old <- eta_new
-  theta_old <- theta_new
-  Z_old <- Z_new
-  alpha_old <- alpha_new
-  e_old <- e_new
-  u_old <- u_new
-  w_old <- w_new
-  
-  if(iter%%10 == 0) {print(paste0("iter = ", iter))}
+  return(list(eta = eta_new, 
+              theta = theta_new, 
+              alpha = alpha_new, 
+              e = e_new, 
+              u = u_new, 
+              w = w_new, 
+              iter_error = iter_error))
 }
+```
+
+``` r
+max_iter <- 50
+delta <- 0.25
+lambda_1 <- 0.2
+lambda_2 <- 1
+tol_error <- 0.1
+
+result <- add_decomp(delta, lambda_1, lambda_2, tol_error, max_iter)
 ```
 
 ![\\lambda\_1, \\lambda\_2,
@@ -257,16 +276,18 @@ for(iter in 1:max_iter){
 "\\lambda_1, \\lambda_2, \\delta") 어떻게?
 
 ``` r
-iter_error %>% data.frame %>%
+result$iter_error %>% 
+  na.omit() %>%
+  data.frame %>%
   mutate(iter = 1:nrow(.)) %>%
-  filter(iter > 15) %>% 
+  #filter(iter > 15) %>% 
   gather(key = "estimator", value = "value", -iter) %>%
   ggplot() +
   geom_line(aes(x = iter, y = value, group = estimator, color = estimator)) +
   facet_wrap(~estimator, scales = "free_y")
 ```
 
-![](Toy_Example_files/figure-gfm/unnamed-chunk-8-1.png)<!-- -->
+![](Toy_Example_files/figure-gfm/unnamed-chunk-9-1.png)<!-- -->
 
   - Stopping criteria
 
@@ -285,7 +306,7 @@ iter_error %>% data.frame %>%
 "Y\\approx\\hat{Y}_{\\tau_\\ell}") 동일.
 
 ``` r
-Y_hat_tau <- lapply(V, FUN = function(x) x %*% theta_new + Z_new) %>%
+Y_hat_tau <- lapply(V, FUN = function(x) x %*% result$theta + X %*% result$alpha) %>%
   `names<-`(value = tau_seq)
 ```
 
@@ -298,17 +319,17 @@ value}](https://latex.codecogs.com/png.latex?%5Cfrac%7B%5Csigma_1%2B%5Ccdots%2B%
 "\\frac{\\sigma_1+\\cdots+\\sigma_5}{\\sigma_1+\\cdots+\\sigma_{20}}\\quad\\text{where }\\sigma_i\\text{ is a singular value}")  
 
 ``` r
-sing_val <- svd(alpha_new)$d
+sing_val <- svd(result$alpha)$d
 sum(sing_val[1:5])/sum(sing_val)
 ```
 
-    ## [1] 0.9771025
+    ## [1] 1
 
 ``` r
-rankMatrix(alpha_new)
+rankMatrix(result$alpha)
 ```
 
-    ## [1] 12
+    ## [1] 5
     ## attr(,"method")
     ## [1] "tolNorm2"
     ## attr(,"useGrad")
@@ -318,8 +339,8 @@ rankMatrix(alpha_new)
 
 ### Sparse matrix
 
-![\\hat{\\Gamma}(\\tau)=V\_{\\tau\_\\ell}\\hat{\\Theta}](https://latex.codecogs.com/png.latex?%5Chat%7B%5CGamma%7D%28%5Ctau%29%3DV_%7B%5Ctau_%5Cell%7D%5Chat%7B%5CTheta%7D
-"\\hat{\\Gamma}(\\tau)=V_{\\tau_\\ell}\\hat{\\Theta}")
+![\\hat{\\gamma}\_j^{(g)}(\\tau\_\\ell)=\\hat{\\theta}\_{j}^{(g)T}\\phi\_s(\\tau)](https://latex.codecogs.com/png.latex?%5Chat%7B%5Cgamma%7D_j%5E%7B%28g%29%7D%28%5Ctau_%5Cell%29%3D%5Chat%7B%5Ctheta%7D_%7Bj%7D%5E%7B%28g%29T%7D%5Cphi_s%28%5Ctau%29
+"\\hat{\\gamma}_j^{(g)}(\\tau_\\ell)=\\hat{\\theta}_{j}^{(g)T}\\phi_s(\\tau)")
 
 ``` r
 gamma_tau_hat <- list()
@@ -328,16 +349,12 @@ for(l in 1:b) {
   gamma_tau_hat[[l]] <- matrix(nrow = (p+1), ncol = m)
   for(i in 1:(p+1)) {
     for(j in 1:m) {
-      theta_j_g <- theta_new[(1+(i-1)*15):(15*i), g]
+      theta_j_g <- result$theta[(1+(i-1)*15):(15*i), j]
       gamma_tau_hat[[l]][i, j] <- theta_j_g %*% phi_tau
     }
   }
 }
 ```
-
-![\\\#\\text{ of non-zero entry in
-}\\Gamma(\\tau)=500](https://latex.codecogs.com/png.latex?%5C%23%5Ctext%7B%20of%20non-zero%20entry%20in%20%7D%5CGamma%28%5Ctau%29%3D500
-"\\#\\text{ of non-zero entry in }\\Gamma(\\tau)=500")
 
 ### sparsity pattern check
 
@@ -357,31 +374,74 @@ num_zero <- which(sp_mat==0, arr.ind = TRUE) %>% nrow
 print(paste0("The number of zero entry in sp_mat is ", num_zero))
 ```
 
-    ## [1] "The number of zero entry in sp_mat is 105"
+    ## [1] "The number of zero entry in sp_mat is 210"
 
 ``` r
-check_sp_pattern <- function(true, est, tol = 0.1^5, idx = FALSE, nnz = num_nz) {
+check_sp_table <- function(true, est, tol = 0.1^5, table = FALSE, nnz = num_nz, nz = num_zero) {
   zero_idx_true <- which(abs(true) < tol, arr.ind = TRUE) %>% as_tibble
   zero_idx_est <- which(abs(est) < tol, arr.ind = TRUE) %>% as_tibble
   TN <- semi_join(zero_idx_true, zero_idx_est, by = c("row", "col"))
   FP <- anti_join(zero_idx_true, zero_idx_est, by = c("row", "col"))
   FN <- anti_join(zero_idx_est, zero_idx_true, by = c("row", "col"))
-  if(idx == FALSE) {return(data.frame(Positive = c(nnz - nrow(FN), nrow(FP)), Negative = c(nrow(FN), nrow(TN))) %>%
-                             `rownames<-`(value = c("Positive", "Negative")))
-    } else {return(list(TN = TN, FP = FP, FN = FN))}
+  result <- data.frame(Positive = c(nnz - nrow(FN), nrow(FP)), Negative = c(nrow(FN), nrow(TN))) %>%
+                             `rownames<-`(value = c("Positive", "Negative"))
+  if(table == FALSE) {return(data.frame(FPR = result[2, 1]/nz, TPR = result[1, 1]/nnz))
+    } else {return(result)}
 }
 ```
 
 ``` r
+lapply(gamma_tau_hat, FUN = function(x) check_sp_table(true = sp_mat, est = x, table = FALSE)) %>%
+  bind_rows %>%
+  summarise_all(mean)
+```
+
+    ##         FPR       TPR
+    ## 1 0.6198413 0.6253968
+
+### ROC curve
+
+``` r
+lamb_2_seq <- seq(from = 0.1, to = 1.1, by = 0.1)
+result <- list()
+
+for(idx in 1:length(lamb_2_seq)) {
+  result[[idx]] <- add_decomp(delta = 0.1, lambda_1 = 0.2, lambda_2 = lamb_2_seq[idx], tol_error = 0.1, max_iter = 50)
+  if((idx %% 2) == 1) print(paste0("iter = ", idx))
+}
+```
+
+``` r
+theta_hat <- result %>%
+  lapply(FUN = function(x) x$theta)
+
+gamma_tau_hat <- list()
+for(idx in 1:length(lamb_2_seq)) {
+  gamma_tau_hat[[idx]] <- list()
+  for(l in 1:b) {
+    gamma_tau_hat[[idx]][[l]] <- matrix(nrow = (p+1), ncol = m)
+    for(i in 1:(p+1)) {
+      for(j in 1:m) {
+        theta_j_g <- theta_hat[[idx]][(1+(i-1)*K):(K*i), j]
+        gamma_tau_hat[[idx]][[l]][i, j] <- theta_j_g %*% phi_tau
+      }
+    }
+  }
+}
+
 ROC_table <- list()
-tol_error_seq <- c(seq(from = 0, to = 1, by = 0.05))
-for(idx in 1:length(tol_error_seq)) {
-  ROC_table[[idx]] <- check_sp_pattern(true = sp_mat, est = gamma_tau_hat[[1]], tol = tol_error_seq[[idx]])
+for(idx in 1:length(lamb_2_seq)) {
+  ROC_table[[idx]] <-gamma_tau_hat[[idx]] %>%
+    lapply(FUN = function(x) check_sp_table(true = sp_mat, est = x)) %>%
+    bind_rows(.id = "tau") %>%
+    mutate(tau = tau_seq)
 }
 
 ROC_table %>%
-  lapply(FUN = function(x) data.frame(FP_rate = x[2, 1]/num_zero, TP_rate = x[1, 1]/num_nz)) %>%
-  bind_rows %>%
+  `names<-`(value = lamb_2_seq) %>%
+  bind_rows(.id = "lamb_2") %>%
+  mutate(tau = as.factor(tau)) %>% 
   ggplot() +
-  geom_line(aes(x = FP_rate, y = TP_rate))
+  geom_line(aes(x = FPR, y = TPR, group = tau, color = tau)) +
+  geom_point(aes(x = FPR, y = TPR))
 ```
