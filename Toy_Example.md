@@ -90,16 +90,16 @@ check_ft <- function(x, tau) {
 ``` r
 K <- 15
 
-tau_seq <- seq(from = 0.4, to = 0.6, length.out = b) 
-Phi <- bs(tau_seq, df = K, degree = 3, intercept = TRUE)
+tau_seq <- seq(from = 0.4, to = 0.6, length.out = b)
+knots_seq <- seq(from = tau_seq[1], to = tau_seq[b], length.out = K - 2) %>% .[-c(1, (K - 2))]
+boundary <- c(range(tau_seq)[1] - 0.02, range(tau_seq)[2] + 0.02)
+Phi <- bs(tau_seq, knots = knots_seq, degree = 3, intercept = TRUE, Boundary.knots = boundary)
 
 attr(Phi, "knots")
 ```
 
-    ## 8.333333% 16.66667%       25% 33.33333% 41.66667%       50% 58.33333% 66.66667% 
-    ## 0.4166667 0.4333333 0.4500000 0.4666667 0.4833333 0.5000000 0.5166667 0.5333333 
-    ##       75% 83.33333% 91.66667% 
-    ## 0.5500000 0.5666667 0.5833333
+    ##  [1] 0.4166667 0.4333333 0.4500000 0.4666667 0.4833333 0.5000000 0.5166667
+    ##  [8] 0.5333333 0.5500000 0.5666667 0.5833333
 
   
 ![\\begin{aligned}\\boldsymbol{v}\_i^{(\\ell)} &= (\\boldsymbol{x}\_i
@@ -172,6 +172,17 @@ add_decomp <- function(delta, lambda_1, lambda_2, tol_error, max_iter) {
   # delta = step size
   # lambda_1 = low rank penalty
   # lambda_2 = sparse penalty
+  
+  # initial value
+  eta_old <- matrix(1, nrow = (p+1)*K, ncol = m) 
+  theta_old <- eta_old
+  alpha_old <- matrix(0, nrow = p+1, ncol = m)
+  Z_old <- X %*% alpha_old
+  e_old <- list()
+  for(l in 1:b) {e_old[[l]] <- Y - Z_old - V[[l]] %*% eta_old}
+  u_old <- list()
+  for(l in 1:b) {u_old[[l]] <- matrix(0, nrow = n, ncol = m)}
+  w_old <- matrix(0, nrow = (p+1)*K, ncol = m)
   
   iter_error <- matrix(ncol = 6, nrow = max_iter) %>%
     `colnames<-`(value = c("eta", "theta", "alpha", "e", "u", "w"))
@@ -263,9 +274,9 @@ add_decomp <- function(delta, lambda_1, lambda_2, tol_error, max_iter) {
 
 ``` r
 max_iter <- 50
-delta <- 0.25
+delta <- 1
 lambda_1 <- 0.2
-lambda_2 <- 1
+lambda_2 <- 4.5
 tol_error <- 0.1
 
 result <- add_decomp(delta, lambda_1, lambda_2, tol_error, max_iter)
@@ -349,8 +360,8 @@ for(l in 1:b) {
   gamma_tau_hat[[l]] <- matrix(nrow = (p+1), ncol = m)
   for(i in 1:(p+1)) {
     for(j in 1:m) {
-      theta_j_g <- result$theta[(1+(i-1)*15):(15*i), j]
-      gamma_tau_hat[[l]][i, j] <- theta_j_g %*% phi_tau
+      theta_j <- result$theta[(1+(i-1)*15):(15*i), j]
+      gamma_tau_hat[[l]][i, j] <- t(theta_j) %*% phi_tau
     }
   }
 }
@@ -392,21 +403,25 @@ check_sp_table <- function(true, est, tol = 0.1^5, table = FALSE, nnz = num_nz, 
 
 ``` r
 lapply(gamma_tau_hat, FUN = function(x) check_sp_table(true = sp_mat, est = x, table = FALSE)) %>%
-  bind_rows %>%
-  summarise_all(mean)
+  bind_rows
 ```
 
     ##         FPR       TPR
-    ## 1 0.6198413 0.6253968
+    ## 1 0.3761905 0.4380952
+    ## 2 0.3761905 0.4380952
+    ## 3 0.4619048 0.5047619
+    ## 4 0.4666667 0.5047619
+    ## 5 0.4000000 0.4761905
+    ## 6 0.4000000 0.4761905
 
 ### ROC curve
 
 ``` r
-lamb_2_seq <- seq(from = 0.1, to = 1.1, by = 0.1)
+lamb_2_seq <- seq(from = 0.5, to = 1.5, by = 0.1)
 result <- list()
 
 for(idx in 1:length(lamb_2_seq)) {
-  result[[idx]] <- add_decomp(delta = 0.1, lambda_1 = 0.2, lambda_2 = lamb_2_seq[idx], tol_error = 0.1, max_iter = 50)
+  result[[idx]] <- add_decomp(delta = 0.25, lambda_1 = 0.2, lambda_2 = lamb_2_seq[idx], tol_error = 0.1, max_iter = 50)
   if((idx %% 2) == 1) print(paste0("iter = ", idx))
 }
 ```
@@ -443,5 +458,7 @@ ROC_table %>%
   mutate(tau = as.factor(tau)) %>% 
   ggplot() +
   geom_line(aes(x = FPR, y = TPR, group = tau, color = tau)) +
-  geom_point(aes(x = FPR, y = TPR))
+  geom_point(aes(x = FPR, y = TPR)) +
+  geom_abline(intercept = 0, slope = 1) +
+  coord_fixed(ratio = 1)
 ```
