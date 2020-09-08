@@ -100,3 +100,16 @@ add_decomp <- function(delta, lambda_1, lambda_2, tol_error, max_iter) {
               w = w_new, 
               iter_error = iter_error))
 }
+
+
+check_sp_table <- function(true, est, tol = 0.1^5, table = FALSE, nnz = num_nz, nz = num_zero) {
+  zero_idx_true <- which(abs(true) < tol, arr.ind = TRUE) %>% as_tibble
+  zero_idx_est <- which(abs(est) < tol, arr.ind = TRUE) %>% as_tibble
+  TN <- semi_join(zero_idx_true, zero_idx_est, by = c("row", "col"))
+  FP <- anti_join(zero_idx_true, zero_idx_est, by = c("row", "col"))
+  FN <- anti_join(zero_idx_est, zero_idx_true, by = c("row", "col"))
+  result <- data.frame(Positive = c(nnz - nrow(FN), nrow(FP)), Negative = c(nrow(FN), nrow(TN))) %>%
+    `rownames<-`(value = c("Positive", "Negative"))
+  if(table == FALSE) {return(data.frame(FPR = result[2, 1]/nz, TPR = result[1, 1]/nnz))
+  } else {return(result)}
+}
