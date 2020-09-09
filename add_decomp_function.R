@@ -103,8 +103,14 @@ add_decomp <- function(delta, lambda_1, lambda_2, tol_error, max_iter) {
 
 
 check_sp_table <- function(true, est, tol = 0.1^5, table = FALSE, nnz = num_nz, nz = num_zero) {
+  # check sparsity pattern of true and est matrix
   zero_idx_true <- which(abs(true) < tol, arr.ind = TRUE) %>% as_tibble
-  zero_idx_est <- which(abs(est) < tol, arr.ind = TRUE) %>% as_tibble
+  zero_idx_est <- lapply(est, FUN = function(x) which(abs(x) < tol, arr.ind = TRUE) %>% as_tibble) %>%
+    bind_rows %>%
+    split(., .$row) %>%
+    lapply(FUN = function(x) x$col %>% unique %>% tibble(col = .)) %>%
+    bind_rows(.id = "row") %>% mutate_all(as.numeric)
+  
   TN <- semi_join(zero_idx_true, zero_idx_est, by = c("row", "col"))
   FP <- anti_join(zero_idx_true, zero_idx_est, by = c("row", "col"))
   FN <- anti_join(zero_idx_est, zero_idx_true, by = c("row", "col"))
