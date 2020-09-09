@@ -111,11 +111,16 @@ check_sp_table <- function(true, est, tol = 0.1^5, table = FALSE, nnz = num_nz, 
     lapply(FUN = function(x) x$col %>% unique %>% tibble(col = .)) %>%
     bind_rows(.id = "row") %>% mutate_all(as.numeric)
   
-  TN <- semi_join(zero_idx_true, zero_idx_est, by = c("row", "col"))
-  FP <- anti_join(zero_idx_true, zero_idx_est, by = c("row", "col"))
-  FN <- anti_join(zero_idx_est, zero_idx_true, by = c("row", "col"))
-  result <- data.frame(Positive = c(nnz - nrow(FN), nrow(FP)), Negative = c(nrow(FN), nrow(TN))) %>%
-    `rownames<-`(value = c("Positive", "Negative"))
+  if(nrow(zero_idx_est) == 0) {
+    result <- data.frame(Positive = c(nnz, nz), Negative = c(0, 0))
+  } else {
+    TN <- semi_join(zero_idx_true, zero_idx_est, by = c("row", "col"))
+    FP <- anti_join(zero_idx_true, zero_idx_est, by = c("row", "col"))
+    FN <- anti_join(zero_idx_est, zero_idx_true, by = c("row", "col"))
+    result <- data.frame(Positive = c(nnz - nrow(FN), nrow(FP)), Negative = c(nrow(FN), nrow(TN))) %>%
+      `rownames<-`(value = c("Positive", "Negative"))
+  }
+  
   if(table == FALSE) {return(data.frame(FPR = result[2, 1]/nz, TPR = result[1, 1]/nnz))
   } else {return(result)}
 }
