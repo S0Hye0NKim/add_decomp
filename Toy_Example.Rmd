@@ -1,7 +1,6 @@
 ---
 title: "Toy Example"
 author: "Sohyeon Kim"
-date: "7/21/2020"
 output: 
   github_document:
     pandoc_args: --webtex
@@ -43,7 +42,14 @@ b <- 6
 num_rank <- 5
 
 X <- matrix(rnorm(n*p, mean = 0, sd = 1), nrow = n) %>% cbind(1, .)   #add intercept term in X
-sp_mat <- rsparsematrix(nrow = p+1, ncol = m, nnz = num_nz)             # make sparse matrix
+
+row_idx <- sample(1:(p+1), size = num_nz, replace = TRUE)     # make sparse matrix following N(4, 1)
+col_idx <- sample(1:m, size = num_nz, replace = TRUE)
+rand.x <- rnorm(num_nz, mean = 4, sd = 1)
+sp_mat <- sparseMatrix(row_idx, col_idx, x = rand.x)
+num_zero <- which(sp_mat==0, arr.ind = TRUE) %>% nrow
+num_nz <- (p+1)*m - num_zero
+
 LR_mat <- matrix(rnorm(m*(p+1), mean = 0, sd = 1), ncol = m)      # make low rank matrix using SVD
 SVD <- svd(LR_mat)
 D_mat <- diag(SVD$d)
@@ -76,11 +82,11 @@ $$\rho_\tau(x) = (\tau - \mathbb{I}(x<0))x$$
 ### 1-2. Basis function
 
 ```{r}
-K <- 15
+K <- 10
 
 tau_seq <- seq(from = 0.4, to = 0.6, length.out = b)
-knots_seq <- seq(from = tau_seq[1], to = tau_seq[b], length.out = K - 2) %>% .[-c(1, (K - 2))]
-boundary <- c(range(tau_seq)[1] - 0.02, range(tau_seq)[2] + 0.02)
+knots_seq <- seq(from = tau_seq[1] - 0.02, to = tau_seq[b] + 0.02, length.out = K - 2) %>% .[-c(1, (K - 2))]
+boundary <- c(tau_seq[1] - 0.02, tau_seq[b] + 0.02)
 Phi <- bs(tau_seq, knots = knots_seq, degree = 3, intercept = TRUE, Boundary.knots = boundary)
 
 attr(Phi, "knots")
@@ -112,22 +118,6 @@ $$\boldsymbol{V}^{(\ell)} = \begin{bmatrix} v_1^{(\ell)} \\v_2^{(\ell)} \\ \vdot
 
 
 $$\boldsymbol{\eta}^{(g)}, \boldsymbol{\theta}^{(g)}, \boldsymbol{w}^{(g)}\in \mathbb{R}^{(p+1)\times K}\\ \boldsymbol{\alpha}^{(g)} \in \mathbb{R}^{p+1} \\ \boldsymbol{e}^{(\ell)(g)}, \boldsymbol{u}^{(\ell)(g)}, \in \mathbb{R}^{n}\\subject\; to \; \boldsymbol{\eta}^{(g)} - \boldsymbol{\theta}^{(g)} = 0, \; and \;\boldsymbol{Y}^{(g)} - \boldsymbol{X}\boldsymbol{\alpha}^{(g)} - \boldsymbol{V}^{(\ell)}\boldsymbol{\eta}^{(g)} - \boldsymbol{e}^{(\ell)(g)} = 0$$
-
-
-```{r}
-eta_old <- matrix(1, nrow = (p+1)*K, ncol = m) 
-theta_old <- eta_old
-alpha_old <- matrix(0, nrow = p+1, ncol = m)
-Z_old <- X %*% alpha_old
-e_old <- list()
-for(l in 1:b) {e_old[[l]] <- Y - Z_old - V[[l]] %*% eta_old}
-u_old <- list()
-for(l in 1:b) {u_old[[l]] <- matrix(0, nrow = n, ncol = m)}
-w_old <- matrix(0, nrow = (p+1)*K, ncol = m)
-```
-
-
-
 
 
 # 2. Algorithm
@@ -241,11 +231,44 @@ add_decomp <- function(delta, lambda_1, lambda_2, tol_error, max_iter) {
 ```
 
 
+
+
+$$\hat{\Gamma}_{11}(\tau_1)=\cdots=\hat{\Gamma}_{11}(\tau_\ell)=0=\Gamma_{11}(\tau)$$
+
+```{r}
+check_sp_table <- function(true, est, tol = 0.1^5, table = FALSE, nnz = num_nz, nz = num_zero) {
+  # check sparsity pattern of true and est matrix
+  zero_idx_true <- which(abs(true) < tol, arr.ind = TRUE) %>% as_tibble
+  zero_idx_est <- lapply(est, FUN = function(x) which(abs(x) < tol, arr.ind = TRUE) %>% as_tibble) %>%
+    bind_rows %>%
+    split(., .$row) %>%
+    lapply(FUN = function(x) x$col %>% unique %>% tibble(col = .)) %>%
+    bind_rows(.id = "row") %>% mutate_all(as.numeric)
+  
+  if(nrow(zero_idx_est) == 0) {
+    result <- data.frame(Positive = c(nnz, nz), Negative = c(0, 0))
+  } else {
+    TN <- semi_join(zero_idx_true, zero_idx_est, by = c("row", "col"))
+    FP <- anti_join(zero_idx_true, zero_idx_est, by = c("row", "col"))
+    FN <- anti_join(zero_idx_est, zero_idx_true, by = c("row", "col"))
+    result <- data.frame(Positive = c(nnz - nrow(FN), nrow(FP)), Negative = c(nrow(FN), nrow(TN))) %>%
+      `rownames<-`(value = c("Positive", "Negative"))
+  }
+  
+  if(table == FALSE) {return(data.frame(FPR = result[2, 1]/nz, TPR = result[1, 1]/nnz))
+    } else {return(result)}
+}
+```
+
+
+
+
+
 ```{r}
 max_iter <- 50
-delta <- 1
+delta <- 0.25
 lambda_1 <- 0.2
-lambda_2 <- 4.5
+lambda_2 <- 2
 tol_error <- 0.1
 
 result <- add_decomp(delta, lambda_1, lambda_2, tol_error, max_iter)
@@ -261,7 +284,7 @@ result$iter_error %>%
   na.omit() %>%
   data.frame %>%
   mutate(iter = 1:nrow(.)) %>%
-  #filter(iter > 15) %>% 
+  filter(iter > 15) %>% 
   gather(key = "estimator", value = "value", -iter) %>%
   ggplot() +
   geom_line(aes(x = iter, y = value, group = estimator, color = estimator)) +
@@ -308,8 +331,8 @@ for(l in 1:b) {
   gamma_tau_hat[[l]] <- matrix(nrow = (p+1), ncol = m)
   for(i in 1:(p+1)) {
     for(j in 1:m) {
-      theta_j <- result$theta[(1+(i-1)*15):(15*i), j]
-      gamma_tau_hat[[l]][i, j] <- t(theta_j) %*% phi_tau
+      theta_j <- result$theta[(1+(i-1)*K):(K*i), j]
+      gamma_tau_hat[[l]][i, j] <- theta_j %*% phi_tau
     }
   }
 }
@@ -325,29 +348,12 @@ data.frame(c("TP", "FP"), c("FN", "TN")) %>%
 ```
 
 
-```{r}
-num_zero <- which(sp_mat==0, arr.ind = TRUE) %>% nrow
-print(paste0("The number of zero entry in sp_mat is ", num_zero))
-```
 
-```{r}
-check_sp_table <- function(true, est, tol = 0.1^5, table = FALSE, nnz = num_nz, nz = num_zero) {
-  zero_idx_true <- which(abs(true) < tol, arr.ind = TRUE) %>% as_tibble
-  zero_idx_est <- which(abs(est) < tol, arr.ind = TRUE) %>% as_tibble
-  TN <- semi_join(zero_idx_true, zero_idx_est, by = c("row", "col"))
-  FP <- anti_join(zero_idx_true, zero_idx_est, by = c("row", "col"))
-  FN <- anti_join(zero_idx_est, zero_idx_true, by = c("row", "col"))
-  result <- data.frame(Positive = c(nnz - nrow(FN), nrow(FP)), Negative = c(nrow(FN), nrow(TN))) %>%
-                             `rownames<-`(value = c("Positive", "Negative"))
-  if(table == FALSE) {return(data.frame(FPR = result[2, 1]/nz, TPR = result[1, 1]/nnz))
-    } else {return(result)}
-}
-```
+
 
 
 ```{r}
-lapply(gamma_tau_hat, FUN = function(x) check_sp_table(true = sp_mat, est = x, table = FALSE)) %>%
-  bind_rows
+check_sp_table(true = sp_mat, est = gamma_tau_hat, table = FALSE)
 ```
 
 
@@ -355,24 +361,25 @@ lapply(gamma_tau_hat, FUN = function(x) check_sp_table(true = sp_mat, est = x, t
 ### ROC curve
 
 ```{r eval = FALSE}
-lamb_2_seq <- seq(from = 0.5, to = 1.5, by = 0.1)
-result <- list()
+lamb_2_seq <- c(0.25, seq(from = 0.3, to = 0.8, by = 0.1), 1, 1.5, 2, 100)
+simul <- list()
 
 for(idx in 1:length(lamb_2_seq)) {
-  result[[idx]] <- add_decomp(delta = 0.25, lambda_1 = 0.2, lambda_2 = lamb_2_seq[idx], tol_error = 0.1, max_iter = 50)
+  simul[[idx]] <- add_decomp(delta = 0.1, lambda_1 = 0.5, lambda_2 = lamb_2_seq[idx], tol_error = 0.1, max_iter = 50)
   if((idx %% 2) == 1) print(paste0("iter = ", idx))
 }
 ```
 
 
 ```{r eval = FALSE}
-theta_hat <- result %>%
+theta_hat <- simul %>%
   lapply(FUN = function(x) x$theta)
 
 gamma_tau_hat <- list()
 for(idx in 1:length(lamb_2_seq)) {
   gamma_tau_hat[[idx]] <- list()
   for(l in 1:b) {
+    phi_tau <- Phi[l, ]
     gamma_tau_hat[[idx]][[l]] <- matrix(nrow = (p+1), ncol = m)
     for(i in 1:(p+1)) {
       for(j in 1:m) {
@@ -385,21 +392,20 @@ for(idx in 1:length(lamb_2_seq)) {
 
 ROC_table <- list()
 for(idx in 1:length(lamb_2_seq)) {
-  ROC_table[[idx]] <-gamma_tau_hat[[idx]] %>%
-    lapply(FUN = function(x) check_sp_table(true = sp_mat, est = x)) %>%
-    bind_rows(.id = "tau") %>%
-    mutate(tau = tau_seq)
-}
+  ROC_table[[idx]] <- check_sp_table(true = sp_mat, est = gamma_tau_hat[[idx]]) 
+} 
 
 ROC_table %>%
   `names<-`(value = lamb_2_seq) %>%
   bind_rows(.id = "lamb_2") %>%
-  mutate(tau = as.factor(tau)) %>% 
+  arrange(FPR, TPR) %>%
   ggplot() +
-  geom_line(aes(x = FPR, y = TPR, group = tau, color = tau)) +
+  geom_line(aes(x = FPR, y = TPR)) +
   geom_point(aes(x = FPR, y = TPR)) +
   geom_abline(intercept = 0, slope = 1) +
-  coord_fixed(ratio = 1)
+  coord_fixed(ratio = 1) +
+  ggtitle(label = expression(delta ~ " =0.25, "~lambda[1] ~ "=0.2, "~lambda[2] ~ "in (0.5, 1.5)")) +
+  scale_y_continuous(limits = c(0, 1))
 ```
 
 
