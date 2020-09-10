@@ -45,7 +45,7 @@ set.seed(0)
 n <- 300
 m <- 15
 p <- 20
-num_nz <- round((p+1)*m*(1/3)) 
+num_nz <- round((p+1)*m*(2/3)) 
 b <- 6
 num_rank <- 5
 
@@ -58,7 +58,7 @@ sp_mat <- sparseMatrix(row_idx, col_idx, x = rand.x)
 num_zero <- which(sp_mat==0, arr.ind = TRUE) %>% nrow
 num_nz <- (p+1)*m - num_zero
 
-LR_mat <- matrix(rnorm(m*(p+1), mean = 0, sd = 1), ncol = m)      # make low rank matrix using SVD
+LR_mat <- matrix(rnorm((p+1)*m, mean = 1, sd = 0.1), ncol = m) # make low rank matrix using SVD
 SVD <- svd(LR_mat)
 D_mat <- diag(SVD$d)
 idx <- (num_rank+1):m
@@ -296,9 +296,9 @@ check_sp_table <- function(true, est, tol = 0.1^5, table = FALSE, nnz = num_nz, 
 
 ``` r
 max_iter <- 50
-delta <- 0.25
-lambda_1 <- 0.2
-lambda_2 <- 2
+delta <- 0.5
+lambda_1 <- 0.15
+lambda_2 <- 2.5
 tol_error <- 0.1
 
 result <- add_decomp(delta, lambda_1, lambda_2, tol_error, max_iter)
@@ -356,19 +356,29 @@ sing_val <- svd(result$alpha)$d
 sum(sing_val[1:5])/sum(sing_val)
 ```
 
-    ## [1] 0.9895551
+    ## [1] 0.9859056
 
 ``` r
 rankMatrix(result$alpha)
 ```
 
-    ## [1] 9
+    ## [1] 11
     ## attr(,"method")
     ## [1] "tolNorm2"
     ## attr(,"useGrad")
     ## [1] FALSE
     ## attr(,"tol")
     ## [1] 4.662937e-15
+
+  
+![\\frac{||\\hat{A}-A||\_F}{||A||\_F}](https://latex.codecogs.com/png.latex?%5Cfrac%7B%7C%7C%5Chat%7BA%7D-A%7C%7C_F%7D%7B%7C%7CA%7C%7C_F%7D
+"\\frac{||\\hat{A}-A||_F}{||A||_F}")  
+
+``` r
+norm(result$alpha - LR_mat, "F")/norm(LR_mat, "F")
+```
+
+    ## [1] 0.2098985
 
 ### Sparse matrix
 
@@ -406,17 +416,54 @@ data.frame(c("TP", "FP"), c("FN", "TN")) %>%
 check_sp_table(true = sp_mat, est = gamma_tau_hat, table = FALSE)
 ```
 
-    ##         FPR       TPR
-    ## 1 0.1814159 0.3258427
+    ##        FPR       TPR
+    ## 1 0.695122 0.7417219
+
+### Frobenius norm ratio
+
+  
+![\\frac{||\\hat{A}-A||\_F}{||A||\_F}](https://latex.codecogs.com/png.latex?%5Cfrac%7B%7C%7C%5Chat%7BA%7D-A%7C%7C_F%7D%7B%7C%7CA%7C%7C_F%7D
+"\\frac{||\\hat{A}-A||_F}{||A||_F}")  
+
+``` r
+lamb_1_seq <- seq(from = 0.05, to = 0.3, by = 0.05)
+simul_lamb1 <- list()
+
+for(idx in 1:length(lamb_1_seq)) {
+  simul_lamb1[[idx]] <- add_decomp(delta = 0.5, lambda_1 = lamb_1_seq[idx], lambda_2 = 2.5,
+                                   tol_error = 0.1, max_iter = 50)
+  if((idx %% 2) == 1) print(paste0("iter = ", idx))
+}
+```
+
+``` r
+alpha_hat <- simul_lamb1 %>% lapply(FUN = function(x) x$alpha)
+
+alpha_hat %>%
+  lapply(FUN = function(x) norm(LR_mat - x, type = "F")/norm(LR_mat, type = "F") %>% data.frame(value = .)) %>%
+  `names<-`(value = lamb_1_seq) %>%
+  bind_rows(.id = "lambda_1") %>%
+  ggplot() +
+  geom_line(aes(x = as.numeric(lambda_1), y = value)) +
+  labs(title = expression("Frobenius norm ratio when "~delta~"=0.1, "~lambda[2]~"=0.5, "~lambda[1]~"in (0.05,0.3)"), 
+       x = expression(lambda[1]))
+```
+
+``` r
+lapply(alpha_hat, FUN = function(x) svd(x) %>% .$d) %>%
+  lapply(FUN = function(x) data.frame(ratio = (sum(x[1:num_rank])/sum(x)), rank = sum(abs(x) > 0.1^5))) %>%
+  `names<-`(value = lamb_1_seq) %>%
+  bind_rows(.id = "lambda1")
+```
 
 ### ROC curve
 
 ``` r
-lamb_2_seq <- c(0.25, seq(from = 0.3, to = 0.8, by = 0.1), 1, 1.5, 2, 100)
+lamb_2_seq <- seq(from = 1, to = 5, by = 0.25)
 simul <- list()
 
 for(idx in 1:length(lamb_2_seq)) {
-  simul[[idx]] <- add_decomp(delta = 0.1, lambda_1 = 0.5, lambda_2 = lamb_2_seq[idx], tol_error = 0.1, max_iter = 50)
+  simul[[idx]] <- add_decomp(delta = 0.5, lambda_1 = 0.2, lambda_2 = lamb_2_seq[idx], tol_error = 0.1, max_iter = 50)
   if((idx %% 2) == 1) print(paste0("iter = ", idx))
 }
 ```
