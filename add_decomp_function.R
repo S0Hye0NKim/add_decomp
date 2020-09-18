@@ -106,10 +106,10 @@ check_sp_table <- function(true, est, tol = 0.1^5, table = FALSE, nnz = num_nz, 
   # check sparsity pattern of true and est matrix
   zero_idx_true <- which(abs(true) < tol, arr.ind = TRUE) %>% as_tibble
   zero_idx_est <- lapply(est, FUN = function(x) which(abs(x) < tol, arr.ind = TRUE) %>% as_tibble) %>%
-    bind_rows %>%
-    split(., .$row) %>%
-    lapply(FUN = function(x) x$col %>% unique %>% tibble(col = .)) %>%
-    bind_rows(.id = "row") %>% mutate_all(as.numeric)
+    bind_rows (.id = "tau") %>%
+    group_by(row, col) %>%
+    summarise(zero = n()) %>%
+    filter(zero == b)
   
   if(nrow(zero_idx_est) == 0) {
     result <- data.frame(Positive = c(nnz, nz), Negative = c(0, 0))
