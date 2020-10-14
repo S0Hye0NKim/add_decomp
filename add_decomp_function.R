@@ -124,3 +124,24 @@ check_sp_table <- function(true, est, tol = 0.1^5, table = FALSE, nnz = num_nz, 
   if(table == FALSE) {return(data.frame(FPR = result[2, 1]/nz, TPR = result[1, 1]/nnz))
   } else {return(result)}
 }
+
+
+# Estimate gamma from theta
+est_gamma <- function(Phi, theta) {
+  l <- nrow(Phi)
+  K <- ncol(Phi)
+  m <- ncol(theta)
+  p <- nrow(theta)/K - 1
+  gamma_tau_hat <- list()
+  for(l in 1:b) {
+    phi_tau <- Phi[l, ]
+    gamma_tau_hat[[l]] <- matrix(nrow = (p+1), ncol = m)
+    for(i in 1:(p+1)) {
+      for(j in 1:m) {
+        theta_j <- theta[(1+(i-1)*K):(K*i), j]
+        gamma_tau_hat[[l]][i, j] <- theta_j %*% phi_tau
+      }
+    }
+  }
+  return(gamma_tau_hat)
+}
