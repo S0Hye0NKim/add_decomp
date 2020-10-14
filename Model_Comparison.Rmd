@@ -1,0 +1,241 @@
+---
+title: "Model Comparison"
+author: "Sohyeon Kim"
+output: 
+  github_document:
+    pandoc_args: --webtex
+header-includes:
+  - \usepackage{kotex}
+---
+
+```{r warning = FALSE, message = FALSE}
+library(tidyverse)
+library(ggplot2)
+library(splines)
+library(Matrix)
+library(pander)
+library(gridExtra)
+source("https://raw.githubusercontent.com/S0Hye0NKim/add_decomp/master/add_decomp_function.R")
+```
+
+
+# 0. Data
+
+$$\begin{aligned}Y &= XB(\tau)\\&=X(A+\Gamma(\tau))\;\text{where A is a low rank and }\Gamma(\tau)\text{ is sparse}\end{aligned}$$
+
+```{r}
+#It is same with the data used in Toy Example
+set.seed(0)
+n <- 300
+m <- 15
+p <- 20
+num_nz <- 15   #round((p+1)*m*(1/5)) 
+b <- 6
+num_rank <- 5
+
+X <- matrix(rnorm(n*p, mean = 0, sd = 1), nrow = n) %>% cbind(1, .)   #add intercept term in X
+
+col_ind <- sample(1:m, size = m, replace = FALSE) # make sparse matrix
+row_ind <- sample(1:(p+1), size = m)
+sp_mat <- matrix(0, nrow = p+1, ncol = m)
+for(i in 1:m) {
+  sp_mat[row_ind[i], col_ind[i]] <- rnorm(1, mean = 5, sd = 0.1)
+}
+num_zero <- which(sp_mat==0, arr.ind = TRUE) %>% nrow
+
+LR_mat <- matrix(rnorm((p+1)*m, mean = 1, sd = 0.1), ncol = m) # make low rank matrix using SVD
+SVD <- svd(LR_mat)
+D_mat <- diag(SVD$d)
+idx <- (num_rank+1):m
+D_mat[idx, idx] <- 0
+LR_mat <- SVD$u %*% D_mat %*% t(SVD$v)          
+
+true_B <- sp_mat + LR_mat            # B(tau) = sparse matrix + low rank matrix
+
+eps <- matrix(rnorm(n*m, mean = 0, sd = 0.1), nrow = n)
+
+Y <- X%*%true_B + eps
+```
+
+
+# 1. Low rank + Sparse Penalty
+
+
+
+$$\sum_{g=1}^m\sum_{\ell=1}^b\sum_{i=1}^n \frac{1}{n}\rho_{\tau_\ell} (e_i^{(\ell)(g)})+ \underbrace{\lambda_1||\textbf{XA}||_*}_{P_{\lambda_1}(\boldsymbol{XA})} + \underbrace{\lambda_2\sum_{j=1}^p\sum_{g=1}^m||\boldsymbol{\theta}_j^{(g)}||_2 }_{P_{\lambda_2}(\boldsymbol{\theta})}$$
+
+```{r}
+K <- 10
+
+tau_seq <- seq(from = 0.4, to = 0.6, length.out = b)
+knots_seq <- seq(from = tau_seq[1] - 0.02, to = tau_seq[b] + 0.02, length.out = K - 2) %>% .[-c(1, (K - 2))]
+boundary <- c(tau_seq[1] - 0.02, tau_seq[b] + 0.02)
+Phi <- bs(tau_seq, knots = knots_seq, degree = 3, intercept = TRUE, Boundary.knots = boundary)
+
+attr(Phi, "knots")
+```
+
+```{r}
+V <- list()
+for(l in 1:b){
+  V_l <- matrix(nrow = n, ncol = (p+1)*K)
+  for(i in 1:n) {
+    v_i_l <- kronecker(X[i, ], Phi[l, ])
+    V_l[i, ] <- v_i_l 
+  }
+  V[[l]] <- V_l
+}
+```
+
+
+```{r}
+max_iter <- 50
+delta <- 0.05
+lambda_1 <- 0.25
+lambda_2 <- 0.49
+tol_error <- 0.1
+
+#start <- Sys.time()
+result <- add_decomp(delta, lambda_1, lambda_2, tol_error, max_iter)
+#end <- Sys.time()
+
+#end - start
+```
+
+
+```{r}
+gamma_hat <- est_gamma(Phi, theta = result$theta)
+beta_hat <- lapply(gamma_hat, FUN = function(x) x + result$alpha)
+
+lapply(beta_hat, FUN = function(x) norm(x - true_B, "F")/norm(true_B, "F")) 
+
+gamma_hat_modified <- gamma_hat
+for(k in 1:length(gamma_hat)) {
+  for(i in 1:(1+p)) {
+    for(j in 1:m) {
+      gamma_hat_modified[[k]][i, j] <- ifelse(gamma_hat[[k]][i, j] != 0, gamma_hat[[k]][i, j] + 3, gamma_hat[[k]][i, j])
+    }
+  }
+}
+```
+
+```{r}
+lamb1_seq <- seq(from = 0, to = 0.5, by = 0.05)
+lamb2_seq <- seq(from = 0, to = 0.5, by = 0.05)
+
+simul <- list(length = length(lamb1_seq))
+
+start <- Sys.time()
+for(i in 1:length(lamb1_seq)) {
+  simul[[i]] = list()
+  for(j in 1:length(lamb2_seq)) {
+    simul[[i]][[j]] <- add_decomp(delta = 0.05, lambda_1 = lamb1_seq[i], lambda_2 = lamb2_seq[j], 
+                                  tol_error = 0.1, max_iter = 50)
+  }
+}
+end <- Sys.time()
+```
+
+
+
+```{r}
+gamma_hat <- list()
+for(i in 1:length(lamb1_seq)) {
+  gamma_hat[[i]] <- lapply(simul[[i]], FUN = function(x) est_gamma(Phi, x$theta))
+  names(gamma_hat[[i]]) <- lamb2_seq
+}
+names(gamma_hat) <- lamb1_seq
+
+beta_hat <- list()
+FR_ratio <- list()
+for(i in 1:length(lamb1_seq)) {
+  beta_hat[[i]] <- list()
+  for(j in 1:length(lamb2_seq)) {
+    beta_hat[[i]][[j]] <- gamma_hat[[i]][[j]][[3]] + simul[[i]][[j]]$alpha
+  }
+  FR_ratio[[i]] <- lapply(beta_hat[[i]], FUN = function(x) data.frame(FR_ratio = norm(x - true_B, "F")/norm(true_B, "F"))) %>%
+    `names<-`(value = lamb2_seq) %>%
+    bind_rows(.id = "lambda_2")
+}
+names(FR_ratio) <- lamb1_seq
+
+FR_ratio <- bind_rows(FR_ratio, .id = "lambda_1")
+```
+
+
+$$\text{Frobenius Ratio} = \frac{||\hat{B}(\tau_3) - B||_F}{||B||_F}$$
+
+
+```{r}
+FR_plot <- FR_ratio %>%
+  ggplot(aes(x = lambda_1, y = lambda_2, fill = FR_ratio)) +
+  geom_tile() +
+  scale_fill_gradient(low = "blue", high = "red") +
+  theme_bw() +
+  theme_bw() +
+  theme(axis.line = element_blank(),
+    panel.grid.major = element_blank(),
+    panel.grid.minor = element_blank(),
+    panel.border = element_blank(),
+    panel.background = element_blank())  +
+  labs(x = expression(lambda[1]), y = expression(lambda[2])) +
+  coord_fixed(ratio = 1)
+```
+
+
+```{r}
+Y_hat <- list()
+MSE <- list()
+for(i in 1:length(lamb1_seq)) {
+  Y_hat[[i]] <- list()
+  MSE[[i]] <- list()
+  for(j in 1:length(lamb2_seq)) {
+    Y_hat[[i]][[j]] <- X %*% beta_hat[[i]][[j]]
+  }
+  MSE[[i]] <- lapply(Y_hat[[i]], FUN = function(x) data.frame(MSE = norm(Y - x, "F"))) %>%
+    `names<-`(value = lamb2_seq) %>%
+    bind_rows(.id = "lambda_2")
+}
+
+MSE_plot <- MSE %>% `names<-`(value = lamb1_seq) %>%
+  bind_rows(.id = "lambda_1") %>%
+  ggplot(aes(x = lambda_1, y = lambda_2, fill = MSE)) +
+  geom_tile() +
+  scale_fill_gradient(low = "blue", high = "red") +
+  theme_bw() +
+  theme_bw() +
+  theme(axis.line = element_blank(),
+    panel.grid.major = element_blank(),
+    panel.grid.minor = element_blank(),
+    panel.border = element_blank(),
+    panel.background = element_blank())  +
+  labs(x = expression(lambda[1]), y = expression(lambda[2])) +
+  coord_fixed(ratio = 1)
+```
+
+```{r}
+grid.arrange(FR_plot, MSE_plot, nrow = 1)
+```
+
+
+# 2. Low rank penalty
+
+$$\hat{\boldsymbol{B}}(\tau) =\text{argmin}_{B(\tau)}\sum_{i=1}^n \frac{1}{n}\rho_{\tau}(Y_i- \boldsymbol{x}_i^T\boldsymbol{B}(\tau)) +\lambda_1||XB(\tau)||_*\\\text{where }B(\tau) = \begin{pmatrix}\beta^{(1)}(\tau),\cdots, \beta^{(m)}(\tau)\end{pmatrix}$$
+
+$$e_i^{(g)} = Y_i^{(g)}-x_i^T\beta^{(g)}\\L_\delta(\beta, e, u) = \sum_{g=1}^m\sum_{i=1}^n\frac{1}{n}\rho_\tau(e_i^{(g)}) +\lambda_1||XB(\tau)||_*+\sum_{g=1}^mu^{(g)T}(Y^{(g)}-X\beta^{(g)}-e^{(g)})+\frac{\delta}{2}||Y^{(g)}-X\beta^{(g)}-e^{(g)}||_2^2$$
+
+$$\begin{aligned}e_i^{(g)} = \begin{cases}\epsilon_i^{(g)} +u_i^{(g)}/\delta-(\tau-1)/n\delta\quad &\text{if }\epsilon_i^{(g)}+u_i^{(g)}/\delta<(\tau-1)/n\delta\\0&\text{if }(\tau-1)/n\delta<\epsilon_i^{(g)}+u_i^{(g)}/\delta<\tau/n\delta\\\epsilon_i^{(g)}+u_i^{(g)}/\delta-\tau/n\delta&\text{if }\epsilon_i^{(g)}+u_i^{(g)}/\delta>\tau/n\delta\end{cases}\end{aligned}$$
+
+```{r}
+result1 = add_decomp(delta = 0.)
+```
+
+
+
+
+
+
+
+
+
+
