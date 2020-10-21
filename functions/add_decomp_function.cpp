@@ -75,3 +75,67 @@ List update_alpha(double delta, double lambda_1, arma::mat Y, arma::mat X, arma:
   arma::mat alpha_new = inv(X.t()*X)*X.t()*Z_new;
   return List::create(Named("Z_new") = Z_new, Named("alpha_new") = alpha_new);
 }
+
+//update_e.cpp
+//[[Rcpp::export]]
+List update_e(double delta, List U, List V, arma::mat Y, arma::mat X, arma::mat A, arma::mat H, 
+              NumericVector tau_seq) {
+  double n = Y.n_rows;
+  double b = U.size();
+  double m = Y.n_cols;
+  arma::mat Z = X*A;
+  List e_new = List(b);
+  for(int l = 0; l < b; l++) {
+    arma::mat mat_E = arma::mat(n, m);
+    arma::mat VH = as<arma::mat>(wrap(V[l]))*H;
+    arma::mat Error = Y - Z - VH;
+    arma::mat mat_U = U[l];
+    for(int g = 0; g < m; g++) {
+      for(int i = 0; i < n; i++) {
+        if(Error(i, g) + mat_U(i, g)/delta < (tau_seq(l)-1)/(n*delta)) {
+          mat_E(i, g) = Error(i, g) + mat_U(i, g)/delta - (tau_seq(l)-1)/(n*delta);
+        } else if(Error(i, g) + mat_U(i, g)/delta > tau_seq(l)/(n*delta)) {
+          mat_E(i, g) = Error(i, g) + mat_U(i, g)/delta - tau_seq(l)/(n*delta);
+        } else {mat_E(i, g) = 0;}
+      }
+    }
+    e_new[l] = mat_E;
+  }
+  return e_new;
+}
+
+//update_multipliers.cpp
+//[[Rcpp::export]]
+List update_multi(List U_old, arma::mat W_old, double delta, arma::mat Y, arma::mat X, arma::mat A, arma::mat H,
+                  arma::mat Theta, List V, List E, bool is_u) {
+  if(is_u == true) {
+    double b = U_old.size();
+    List U_new = List(b);
+    for(int l = 0; l < b; l++) {
+      arma::mat VH = as<arma::mat>(wrap(V[l]))*H;
+      arma::mat mat_E = E[l];
+      arma::mat mat_U_old = U_old[l];
+      arma::mat mat_U = mat_U_old + delta * (Y - X*A - VH - mat_E);
+      U_new[l] = mat_U;
+    }
+    return U_new;
+  } else {
+    arma::mat W_new = W_old + delta *(Theta - H);
+    return List::create(W_new);
+  }
+}
+
+//calculate_iteration_error.cpp
+//[[Rcpp::export]]
+double calc_err(List Old, List New) {
+  Function f("Reduce");
+  double b = Old.size();
+  List FR_list = List(b);
+  for(int l = 0; l < b; l++) {
+    arma::mat Old_mat = Old[l];
+    arma::mat New_mat = New[l];
+    FR_list[l] = norm(Old_mat - New_mat, "fro");
+  }
+  double FR_sum = as<double>(wrap(f(Named("f") = "+", Named("x") = FR_list)));
+  return FR_sum;
+}
