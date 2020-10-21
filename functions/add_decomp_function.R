@@ -7,9 +7,9 @@ add_decomp <- function(delta, lambda_1, lambda_2, tol_error, max_iter) {
   eta_old <- matrix(1, nrow = (p+1)*K, ncol = m) 
   theta_old <- eta_old
   alpha_old <- matrix(0, nrow = p+1, ncol = m)
-  Z_old <- X %*% alpha_old
+  Z_old <- prod_AB(A = X, B = alpha_old, A_t = FALSE, B_t = FALSE)
   e_old <- list()
-  for(l in 1:b) {e_old[[l]] <- Y - Z_old - V[[l]] %*% eta_old}
+  for(l in 1:b) {e_old[[l]] <- Y - Z_old - prod_AB(A = V[[l]], B = eta_old, A_t = FALSE, B_t = FALSE)}
   u_old <- list()
   for(l in 1:b) {u_old[[l]] <- matrix(0, nrow = n, ncol = m)}
   w_old <- matrix(0, nrow = (p+1)*K, ncol = m)
@@ -17,69 +17,43 @@ add_decomp <- function(delta, lambda_1, lambda_2, tol_error, max_iter) {
   iter_error <- matrix(ncol = 6, nrow = max_iter) %>%
     `colnames<-`(value = c("eta", "theta", "alpha", "e", "u", "w"))
   
-  sum_V <- Reduce("+", V)
-  VV_prod <- lapply(V, FUN = function(x) t(x) %*% x)   # V^TV
-  sum_VV <- Reduce("+", VV_prod)
+  sum_V <- Sum_Mat(V)
+  VV_prod <- lapply(V, FUN = function(x) prod_AB(x, x, A_t = TRUE, B_t = FALSE))   # V^TV
+  sum_VV <- Sum_Mat(VV_prod)
   
   for(iter in 1:max_iter) {
     # Process for eta
     eta_new <- matrix(nrow = (p+1)*K, ncol = m)
-    Vu_prod <- mapply(function(x,y) t(x) %*% y, V, u_old, SIMPLIFY = FALSE)
-    Ve_prod <- mapply(function(x,y) t(x) %*% y, V, e_old, SIMPLIFY = FALSE)
-    eta_new <- (solve(sum_VV+diag(1, (p+1)*K))/delta) %*% (w_old + delta * theta_old + Reduce("+", Vu_prod)
-                                                           + delta * t(sum_V) %*% (Y - Z_old)
-                                                           - delta * Reduce("+", Ve_prod))
+    Vu_prod <- mapply(function(x,y) prod_AB(x, y, A_t = TRUE, B_t = FALSE), V, u_old, SIMPLIFY = FALSE)
+    Ve_prod <- mapply(function(x,y) prod_AB(x, y, A_t = TRUE, B_t = FALSE), V, e_old, SIMPLIFY = FALSE)
+    eta_new <- update_eta(delta, sum_VV, W = w_old, Theta = theta_old, 
+                          sum_VU = Sum_Mat(Vu_prod), sum_V, Y, Z = Z_old, sum_VE = Sum_Mat(Ve_prod))
     
     # Process for theta
-    theta_new <- matrix(nrow = (p+1)*K, ncol = m)
-    for (g in 1:m) {
-      r_g <- eta_new[, g] - w_old[, g]/delta
-      value <- 1 - (lambda_2/(delta * abs(r_g)))
-      theta_new[, g] <- ifelse(value > 0, value * r_g, 0)
-    }
+    theta_new <- update_theta(delta, lambda_2, Eta = eta_new, W = w_old)
     
     # Process for Z=XA
-    Y_list <- list()
-    for(i in 1:l) {Y_list[[i]] <- Y}
-    VH_list <- lapply(V, FUN = function(x) x %*% eta_new)
-    obj_list <- mapply(function(Y, VH, E, U) Y - VH - E - U/delta, Y_list, VH_list, e_old, u_old, SIMPLIFY = FALSE)
-    obj <- Reduce("+", obj_list)/b 
-    SVD <- svd(obj)
-    new_singular <- sapply(SVD$d - lambda_1/(delta*b), FUN = function(x) max(x, 0))
-    Z_new <- SVD$u %*% diag(new_singular) %*% t(SVD$v)
-    alpha_new <- solve(t(X) %*% X) %*% t(X) %*% Z_new
+    sub_process <- update_alpha(delta, lambda_1, Y = Y, X = X, H = eta_new, V = V, E = e_old, U = u_old)
+    Z_new <- sub_process$Z_new
+    alpha_new <- sub_process$alpha_new
     
     # Process for e
-    e_new <- list()
-    for(l in 1:b){
-      e_new[[l]] <- matrix(nrow = n, ncol = m)
-      for(g in 1:m) {
-        error <- Y[, g] - Z_new[, g] - V[[l]] %*% eta_new[, g]   #error = Y - XA - VH
-        value <- error + u_old[[l]][, g]/delta
-        e_new[[l]][, g] <- case_when(value > tau_seq[l]/(n*delta) ~ value - tau_seq[l]/(n*delta), 
-                                     value < (tau_seq[l]-1)/(n*delta) ~ value - (tau_seq[l]-1)/(n*delta), 
-                                     value >=(tau_seq[l]-1)/(n*delta) & value <= tau_seq[l]/(n*delta) ~ 0)
-      }
-    }
+    e_new <- update_e(delta, U = u_old, V = V, Y = Y, X = X, A = alpha_new, H = eta_new, tau_seq = tau_seq)
     
     # Process for multiplier u
-    u_new <- list()
-    for(l in 1:b) {
-      u_new[[l]] <- u_old[[l]] + delta * (Y - Z_new - V[[l]] %*% eta_new - e_new[[l]])
-    }
-    
+    u_new <- update_multi(U_old = u_old, W_old = w_old, delta, Y, X, A = alpha_new, H = eta_new, 
+                          Theta = theta_new, V = V, E = e_new, is_u = TRUE)
     # Process for multiplier w
-    w_new <- w_old + delta * (theta_new - eta_new)
+    w_new <- update_multi(U_old = u_old, W_old = w_old, delta, Y, X, A = alpha_new, H = eta_new, 
+                          Theta = theta_new, V = V, E = e_new, is_u = FALSE) %>% .[[1]]
     
     # Update iteration error
-    iter_error[iter, "eta"] <- Matrix::norm(eta_old - eta_new, type = "F")
-    iter_error[iter, "theta"] <- Matrix::norm(theta_old - theta_new, type = "F")
-    iter_error[iter, "alpha"] <- Matrix::norm(alpha_old - alpha_new, type = "F")
-    e_diff <- mapply(FUN = function(old, new) old - new, e_old, e_new, SIMPLIFY = FALSE)  # sum of frobenius norm
-    iter_error[iter, "e"] <- lapply(e_diff, FUN = function(x) Matrix::norm(x, type = "F")) %>% Reduce("+", .)
-    u_diff <- mapply(FUN = function(old, new) old - new, u_old, u_new, SIMPLIFY = FALSE)
-    iter_error[iter, "u"] <- lapply(u_diff, FUN = function(x) Matrix::norm(x, type = "F")) %>% Reduce("+", .)
-    iter_error[iter, "w"] <- Matrix::norm(w_old - w_new, type = "F")
+    iter_error[iter, "eta"] <- calc_err(list(eta_old), list(eta_new))
+    iter_error[iter, "theta"] <- calc_err(list(theta_old), list(theta_new))
+    iter_error[iter, "alpha"] <- calc_err(list(alpha_old), list(alpha_new))
+    iter_error[iter, "e"] <- calc_err(e_old, e_new)
+    iter_error[iter, "u"] <- calc_err(u_old, u_new)
+    iter_error[iter, "w"] <- calc_err(list(w_old), list(w_new))
     
     if(sum(iter_error[iter, ]) < tol_error) break
     
@@ -101,7 +75,7 @@ add_decomp <- function(delta, lambda_1, lambda_2, tol_error, max_iter) {
               iter_error = iter_error))
 }
 
-
+# Calculate TP, TN, FP, FN of sparse matrix
 check_sp_table <- function(true, est, tol = 0.1^5, table = FALSE, nnz = num_nz, nz = num_zero) {
   # check sparsity pattern of true and est matrix
   zero_idx_true <- which(abs(true) < tol, arr.ind = TRUE) %>% as_tibble
