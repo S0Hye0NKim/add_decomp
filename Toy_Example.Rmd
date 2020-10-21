@@ -17,6 +17,7 @@ library(pander)
 library(gridExtra)
 library(foreach)
 library(doParallel)
+library(Rcpp)
 ```
 
 
@@ -110,17 +111,16 @@ $$\begin{aligned}\boldsymbol{v}_i^{(\ell)} &= (\boldsymbol{x}_i \otimes \Phi(\ta
 
 ### 1-3. New design matrix for regional quantile
 
+
 ```{r}
-V <- list()
-for(l in 1:b){
-  V_l <- matrix(nrow = n, ncol = (p+1)*K)
-  for(i in 1:n) {
-    v_i_l <- kronecker(X[i, ], Phi[l, ])
-    V_l[i, ] <- v_i_l 
-  }
-  V[[l]] <- V_l
-}
+sourceCpp("functions/add_decomp_function.cpp")
 ```
+
+```{r}
+V <- calc_V(X, Phi)
+```
+
+
 
 
  * Dimension for V : $b \times n \times (p+1)K$
@@ -138,6 +138,9 @@ $$\boldsymbol{\eta}^{(g)}, \boldsymbol{\theta}^{(g)}, \boldsymbol{w}^{(g)}\in \m
 $$\begin{aligned}\boldsymbol{Y}&=\boldsymbol{XA}+\boldsymbol{X\Gamma}(\tau)\\&=\boldsymbol{Z}+\boldsymbol{V}_{\tau_\ell}\boldsymbol{\Theta}\end{aligned}$$
 
 
+
+
+
 ```{r}
 add_decomp <- function(delta, lambda_1, lambda_2, tol_error, max_iter) {
   # delta = step size
@@ -148,9 +151,9 @@ add_decomp <- function(delta, lambda_1, lambda_2, tol_error, max_iter) {
   eta_old <- matrix(1, nrow = (p+1)*K, ncol = m) 
   theta_old <- eta_old
   alpha_old <- matrix(0, nrow = p+1, ncol = m)
-  Z_old <- X %*% alpha_old
+  Z_old <- prod_AB(A = X, B = alpha_old, A_t = FALSE, B_t = FALSE)
   e_old <- list()
-  for(l in 1:b) {e_old[[l]] <- Y - Z_old - V[[l]] %*% eta_old}
+  for(l in 1:b) {e_old[[l]] <- Y - Z_old - prod_AB(A = V[[l]], B = eta_old, A_t = FALSE, B_t = FALSE)}
   u_old <- list()
   for(l in 1:b) {u_old[[l]] <- matrix(0, nrow = n, ncol = m)}
   w_old <- matrix(0, nrow = (p+1)*K, ncol = m)
@@ -179,36 +182,22 @@ add_decomp <- function(delta, lambda_1, lambda_2, tol_error, max_iter) {
     alpha_new <- sub_process$alpha_new
     
     # Process for e
-    e_new <- list()
-    for(l in 1:b){
-      e_new[[l]] <- matrix(nrow = n, ncol = m)
-      for(g in 1:m) {
-        error <- Y[, g] - Z_new[, g] - V[[l]] %*% eta_new[, g]   #error = Y - XA - VH
-        value <- error + u_old[[l]][, g]/delta
-        e_new[[l]][, g] <- case_when(value > tau_seq[l]/(n*delta) ~ value - tau_seq[l]/(n*delta), 
-                                     value < (tau_seq[l]-1)/(n*delta) ~ value - (tau_seq[l]-1)/(n*delta), 
-                                     value >=(tau_seq[l]-1)/(n*delta) & value <= tau_seq[l]/(n*delta) ~ 0)
-      }
-    }
+    e_new <- update_e(delta, U = u_old, V = V, Y = Y, X = X, A = alpha_new, H = eta_new, tau_seq = tau_seq)
     
     # Process for multiplier u
-    u_new <- list()
-    for(l in 1:b) {
-      u_new[[l]] <- u_old[[l]] + delta * (Y - Z_new - V[[l]] %*% eta_new - e_new[[l]])
-    }
-    
+    u_new <- update_multi(U_old = u_old, W_old = w_old, delta, Y, X, A = alpha_new, H = eta_new, 
+                           Theta = theta_new, V = V, E = e_new, is_u = TRUE)
     # Process for multiplier w
-    w_new <- w_old + delta * (theta_new - eta_new)
+    w_new <- update_multi(U_old = u_old, W_old = w_old, delta, Y, X, A = alpha_new, H = eta_new, 
+                           Theta = theta_new, V = V, E = e_new, is_u = FALSE) %>% .[[1]]
     
     # Update iteration error
-    iter_error[iter, "eta"] <- Matrix::norm(eta_old - eta_new, type = "F")
-    iter_error[iter, "theta"] <- Matrix::norm(theta_old - theta_new, type = "F")
-    iter_error[iter, "alpha"] <- Matrix::norm(alpha_old - alpha_new, type = "F")
-    e_diff <- mapply(FUN = function(old, new) old - new, e_old, e_new, SIMPLIFY = FALSE)  # sum of frobenius norm
-    iter_error[iter, "e"] <- lapply(e_diff, FUN = function(x) Matrix::norm(x, type = "F")) %>% Reduce("+", .)
-    u_diff <- mapply(FUN = function(old, new) old - new, u_old, u_new, SIMPLIFY = FALSE)
-    iter_error[iter, "u"] <- lapply(u_diff, FUN = function(x) Matrix::norm(x, type = "F")) %>% Reduce("+", .)
-    iter_error[iter, "w"] <- Matrix::norm(w_old - w_new, type = "F")
+    iter_error[iter, "eta"] <- calc_err(list(eta_old), list(eta_new))
+    iter_error[iter, "theta"] <- calc_err(list(theta_old), list(theta_new))
+    iter_error[iter, "alpha"] <- calc_err(list(alpha_old), list(alpha_new))
+    iter_error[iter, "e"] <- calc_err(e_old, e_new)
+    iter_error[iter, "u"] <- calc_err(u_old, u_new)
+    iter_error[iter, "w"] <- calc_err(list(w_old), list(w_new))
     
     if(sum(iter_error[iter, ]) < tol_error) break
     
