@@ -139,3 +139,25 @@ double calc_err(List Old, List New) {
   double FR_sum = as<double>(wrap(f(Named("f") = "+", Named("x") = FR_list)));
   return FR_sum;
 }
+
+//calculate_kronecker_product_V.cpp
+//[[Rcpp::export]]
+List calc_V(arma::mat X, arma::mat Phi) {
+  double n = X.n_rows;
+  double p = X.n_cols;
+  double K = Phi.n_cols;
+  double b = Phi.n_rows;
+  Function f("kronecker");
+  List V = List(b);
+  for(int l = 0; l<b; l++) {
+    arma::mat mat_V = arma::mat(n, p*K);
+    arma::rowvec Phi_vec = Phi.row(l);
+    for(int i = 0; i<n; i++) {
+      arma::rowvec X_vec = X.row(i);
+      arma::rowvec v_i_l = as<arma::rowvec>(wrap(f(Named("X") = X_vec, Named("Y") = Phi_vec)));
+      mat_V.row(i) = v_i_l;
+    }
+    V[l] = mat_V;
+  }
+  return V;
+}
