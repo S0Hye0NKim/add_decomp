@@ -1,0 +1,255 @@
+---
+title: "CCLE"
+author: "Sohyeon Kim"
+date: "10/18/2020"
+output: pdf_document
+---
+
+# packages
+```{r warning = FALSE, message = FALSE, eval = FALSE}
+library(tidyverse)
+library(ggplot2)
+library(Matrix)
+library(data.table)
+library(pander)
+library(Rcpp)
+library(splines)
+
+source("https://raw.githubusercontent.com/S0Hye0NKim/add_decomp/master/functions/add_decomp_function.R")
+sourceCpp("functions/add_decomp_function.cpp")
+```
+
+
+
+
+# 0. Data & Screening
+
+
+## 0-(1) Screening Y
+
+```{r}
+Y <- fread("resp_mat.csv")[, -1]
+m <- ncol(Y)
+names(Y) <- paste0("g", 1:m)
+
+Y_sd <- Y[, lapply(.SD, sd)] %>% as.matrix %>% t()
+data.frame(Y_sd) %>%
+  mutate(group = rownames(.)) %>%
+  select(group, Y_sd) %>%
+  arrange(Y_sd) %>% head(5)
+
+Y <- Y[, -"g11"] %>% scale()
+m <- ncol(Y)
+trt_name <- colnames(Y)
+```
+
+group 11의 sd = 0.08 -> 제거
+
+## 0-(2) Screening X
+
+### 0-(2)-(1) Standard deviation of X
+
+ * Assumption : Genes with small sd are irrelevant to the drug responses. 
+
+```{r}
+X <- fread("express_mat.csv")
+cell_name <- X[[1]]
+rownames(X) <- cell_name
+X <- X[, -1]
+
+X_sd <- X[, lapply(.SD, FUN = sd)] %>% as.matrix() %>% t()
+idx_scr_sd <-  data.frame(X_sd) %>%
+  mutate(variable = rownames(.)) %>%
+  select(variable, X_sd) %>%
+  arrange(-X_sd) %>% 
+  .[1:10000, ] %>% .$variable
+
+X <- select(X, idx_scr_sd)
+```
+
+
+### 0-(2)-(2) Correlation of X and Y
+
+$$\frac{1}{23}\sum_{g\ne11}|\text{cor}(x_j, y_g)|$$
+
+ * Assumption : Genes having low correlations with drugs may not affect the drug responses. 
+
+```{r}
+n <- nrow(X)
+p <- 100
+
+idx_scr_cor <- cor(X, Y) %>% abs %>%
+  apply(MARGIN = 1, FUN = mean) %>%
+  data.frame(variable = names(.), cor = .) %>%
+  arrange(-cor) %>% first(p) %>% .$variable
+
+X <- select(X, idx_scr_cor) %>% scale() %>% cbind(1, .)
+colnames(X)[1] <- "intercept"
+gene_ex <- colnames(X)
+```
+
+
+
+```{r}
+K <- 10
+b <- 5
+
+tau_seq <- seq(from = 0.4, to = 0.6, length.out = b)
+knots_seq <- seq(from = tau_seq[1] - 0.02, to = tau_seq[b] + 0.02, length.out = K - 2) %>% .[-c(1, (K - 2))]
+boundary <- c(tau_seq[1] - 0.02, tau_seq[b] + 0.02)
+Phi <- bs(tau_seq, knots = knots_seq, degree = 3, intercept = TRUE, Boundary.knots = boundary)
+
+V <- calc_V(as.matrix(X), Phi)
+```
+
+
+```{r}
+max_iter <- 50
+delta <- 0.01
+lambda_1 <- 0.05
+lambda_2 <- 0.05
+tol_error <- 0.1
+
+start <- Sys.time()
+result <- add_decomp(delta, lambda_1, lambda_2, tol_error, max_iter, X = as.matrix(X), Y = as.matrix(Y), 
+                     V = V, Phi = Phi)
+end <- Sys.time()
+
+end - start
+```
+```{r}
+result$iter_error %>% 
+  na.omit() %>%
+  data.frame %>%
+  mutate(iter = 1:nrow(.)) %>%
+  filter(iter > 15) %>% 
+  gather(key = "estimator", value = "value", -iter) %>%
+  ggplot() +
+  geom_line(aes(x = iter, y = value, group = estimator, color = estimator)) +
+  facet_wrap(~estimator, scales = "free_y")
+```
+
+```{r}
+sing_val <- svd(result$alpha)$d
+sum(sing_val[1:1])/sum(sing_val)
+rankMatrix(result$alpha)
+```
+
+
+```{r}
+gamma_hat <- est_gamma(Phi, result$theta)
+
+gamma_sing_val <- svd(gamma_hat[[3]]) %>% 
+  .$d
+
+sum(gamma_sing_val[1:1])/sum(gamma_sing_val)
+(gamma_sing_val > 0.1^5) %>% sum
+```
+
+
+
+```{r}
+data.frame(col = rep(1:m, each = (p+1)), 
+           row = rep(1:(p+1), m),
+           value = as.vector(gamma_hat[[3]])) %>%
+  mutate(value = ifelse(abs(value) < 0.1^5, 0, value)) %>%
+  ggplot(aes(x = col, y = -row, fill = value)) +
+  geom_tile(color = "grey") +
+  scale_fill_gradient2(low = "red",mid = "white", high = "blue") +
+  theme_bw() +
+  theme(axis.line = element_blank(),
+    panel.grid.major = element_blank(),
+    panel.grid.minor = element_blank(),
+    panel.border = element_blank(),
+    panel.background = element_blank(), 
+    axis.title.x = element_blank(), 
+    axis.text.x = element_blank(), 
+    axis.ticks.x = element_blank(), 
+    axis.title.y = element_blank(), 
+    axis.text.y = element_blank(), 
+    axis.ticks.y = element_blank()) +
+  ggtitle(expression(Gamma~"("~tau[3]~"=0.5)"))
+```
+
+```{r}
+gamma_hat <- est_gamma(Phi, theta = result$theta)
+
+lapply(gamma_hat, FUN = function(x) data.frame(col = rep(1:m, each = (p+1)),
+                                                   row = rep(1:(p+1), m),
+                                                   value = as.vector(x))) %>%
+  `names<-`(tau_seq) %>%
+  bind_rows(.id = "tau") %>%
+  mutate(is_nonzero = ifelse(abs(value) < 0.1^5, 0, 1)) %>%
+  group_by(col, row) %>%
+  summarise(is_nonzero = mean(is_nonzero)) %>%
+  mutate(is_nonzero = ifelse(is_nonzero == 0, 0, 1) %>% as.character) %>%
+  ggplot(aes(x = col, y = -row, fill = is_nonzero)) +
+  geom_tile(color = "grey") +
+  scale_fill_manual(values = c("white", "black")) + 
+  theme_bw() +
+  theme(axis.line = element_blank(),
+    panel.grid.major = element_blank(),
+    panel.grid.minor = element_blank(),
+    panel.border = element_blank(),
+    panel.background = element_blank(), 
+    axis.title.x = element_blank(), 
+    axis.text.x = element_blank(), 
+    axis.ticks.x = element_blank(), 
+    axis.title.y = element_blank(), 
+    axis.text.y = element_blank(), 
+    axis.ticks.y = element_blank()) +
+  ggtitle(expression("all of"~Gamma~"("~tau[l]~")"))
+```
+```{r}
+idx_ex <- data.frame(col = rep(1:m, each = (p+1)), 
+           row = rep(1:(p+1), m),
+           value = as.vector(gamma_hat[[3]])) %>%
+  mutate(value = ifelse(abs(value) < 0.1^5, 0, value %>% round(3))) %>%
+  filter(value != 0) %>%
+  group_by(row) %>%
+  summarise(n = n()) %>%
+  filter(n != 23) %>% .$row
+```
+
+```{r}
+gamma_hat[[3]][idx_ex, ] %>% as(., "dgCMatrix") %>% round(2) %>%
+  `rownames<-`(value = gene_ex[idx_ex]) %>%
+  `colnames<-`(value = trt_name) 
+```
+
+
+
+
+# various lambda_1
+
+```{r}
+lamb_1_seq <- seq(from = 0.005, to = 0.1, by = 0.005)
+simul_lamb1 <- list()
+
+for(idx in 1:length(lamb_1_seq)) {
+  simul_lamb1[[idx]] <- add_decomp(delta = 0.005, lambda_1 = lamb_1_seq[idx], lambda_2 = 0.2,
+                                   tol_error = 0.1, max_iter = 50, 
+                                   X = as.matrix(X), Y = as.matrix(Y), V = V, Phi = Phi)
+  if((idx %% 2) == 1) print(paste0("iter = ", idx))
+}
+```
+
+```{r}
+alpha_hat <- simul_lamb1 %>% lapply(FUN = function(x) x$alpha)
+
+lapply(alpha_hat, FUN = function(x) svd(x) %>% .$d) %>%
+  lapply(FUN = function(x) data.frame(ratio = (sum(x[1:3])/sum(x)), rank = sum(abs(x) > 0.1^5))) %>%
+  `names<-`(value = lamb_1_seq) %>%
+  bind_rows(.id = "lambda1")
+```
+
+
+```{r}
+alpha_col %>% lapply(FUN = function(x) data.frame(GENE = colnames(X), alpha_hat = x) %>% arrange(-alpha_hat)) %>% `names<-`(value = lamb_1_seq) %>% lapply(FUN = function(x) x[9, ]) %>% bind_rows(.id = "lambda_1")
+```
+
+
+
+
+
+
