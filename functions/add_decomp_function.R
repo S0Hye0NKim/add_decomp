@@ -1,4 +1,4 @@
-add_decomp <- function(delta, lambda_1, lambda_2, tol_error, max_iter) {
+add_decomp <- function(delta, lambda_1, lambda_2, tol_error, max_iter, X, Y, V, Phi) {
   # delta = step size
   # lambda_1 = low rank penalty
   # lambda_2 = sparse penalty
