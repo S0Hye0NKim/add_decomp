@@ -27,7 +27,7 @@ sourceCpp("functions/add_decomp_function.cpp")
 
 ## 0-(1) Screening Y
 
-```{r}
+```{r message = FALSE, warning = FALSE}
 Y <- fread("resp_mat.csv")[, -1]
 m <- ncol(Y)
 trt_nm <- readLines("trt_nm.txt", encoding = "UTF-8") %>%
@@ -47,11 +47,7 @@ Y <- Y[, -"Panobinostat"]
 m <- ncol(Y)
 ```
 
-
-
-
-
-group 11의 sd = 0.08 -> 제거
+Panobinostat 의 sd = 0.08 -> 제거
 
 ## 0-(2) Screening X
 
@@ -114,10 +110,10 @@ V <- calc_V(as.matrix(X), Phi)
 
 
 ```{r}
-max_iter <- 100
-delta <- 0.2
-lambda_1 <- 0.5
-lambda_2 <- 1
+max_iter <- 300
+delta <- 1
+lambda_1 <- 1
+lambda_2 <- 1.5
 tol_error <- 0.1
 
 start <- Sys.time()
@@ -211,37 +207,59 @@ lapply(gamma_hat, FUN = function(x) data.frame(col = rep(1:m, each = (p+1)),
   ggtitle(expression("all of"~Gamma~"("~tau[l]~")"))
 ```
 
+# Check loss sum
+
+$$\sum_\ell^{b}\sum_{g=1}^m\sum_{i=1}^n\rho_\tau(Y_i^{(g)}-x_i^T[\alpha^{(g)}+\gamma^{(g)}(\tau)])\\=\sum_\ell^{b}\sum_{g=1}^m\sum_{i=1}^n\rho_\tau(e_i^{(\ell)(g)})$$
 
 
 ```{r}
-idx_ex <- data.frame(col = rep(1:m, each = (p+1)), 
-           row = rep(1:(p+1), m),
-           value = as.vector(gamma_hat[[3]])) %>%
-  mutate(value = ifelse(abs(value) < 0.1^5, 0, value %>% round(3))) %>%
-  filter(value != 0) %>%
-  group_by(row) %>%
-  summarise(n = n()) %>%
-  filter(n != 23) %>% .$row
+check_ft <- function(x, tau) {
+  z <- ifelse(x<0, (tau-1)*x, tau*x)
+  return(z)
+}
+```
+
+
+```{r}
+names(result$e) <- tau_seq
+
+cl_sum <- list()
+for(i in 1:length(result$e)) {
+  cl_sum[[i]] <- check_ft(result$e[[i]], tau = tau_seq[i])
+}
+
+lapply(cl_sum, FUN = function(x) data.frame(cl_sum = apply(x, MARGIN = 2, FUN = sum) %>% sum)) %>%
+  `names<-`(value = tau_seq) %>%
+  bind_rows(.id = "tau") %>%
+  summarise(cl_sum = sum(cl_sum))
 ```
 
 ```{r}
-gamma_hat[[3]][idx_ex, ] %>% as(., "dgCMatrix") %>% round(2) %>%
-  `rownames<-`(value = gene_ex[idx_ex]) %>%
-  `colnames<-`(value = trt_nm) 
-```
+est_beta <- lapply(gamma_hat, FUN = function(x) x + result$alpha)
+est_e <- lapply(est_beta, FUN = function(x) as.matrix(Y) - X %*% x)
 
+cl_sum <- list()
+for(i in 1:length(est_e)) {
+  cl_sum[[i]] <- check_ft(est_e[[i]], tau = tau_seq[i])
+}
+
+lapply(cl_sum, FUN = function(x) data.frame(cl_sum = apply(x, MARGIN = 2, FUN = sum) %>% sum)) %>%
+  `names<-`(value = tau_seq) %>%
+  bind_rows(.id = "tau") %>%
+  summarise(cl_sum = sum(cl_sum))
+```
 
 
 
 # various lambda_1
 
 ```{r}
-lamb_1_seq <- seq(from = 0, to = 0.05, by = 0.01) %>% c(seq(from = 0.1, to = 1, by = 0.1))
+lamb_1_seq <- seq(from = 0, to = 0.05, by = 0.01) %>% c(seq(from = 0.1, to = 1, by = 0.1), 2, 4, 6)
 simul_lamb1 <- list()
 
 for(idx in 1:length(lamb_1_seq)) {
-  simul_lamb1[[idx]] <- add_decomp(delta = 0.01, lambda_1 = lamb_1_seq[idx], lambda_2 = 0.08,
-                                   tol_error = 0.1, max_iter = 50, 
+  simul_lamb1[[idx]] <- add_decomp(delta = 1, lambda_1 = lamb_1_seq[idx], lambda_2 = 1.5,
+                                   tol_error = 0.1, max_iter = 300, 
                                    X = as.matrix(X), Y = as.matrix(Y), V = V, Phi = Phi)
   if((idx %% 2) == 1) print(paste0("iter = ", idx))
 }
@@ -251,9 +269,13 @@ for(idx in 1:length(lamb_1_seq)) {
 alpha_hat <- simul_lamb1 %>% lapply(FUN = function(x) x$alpha)
 
 lapply(alpha_hat, FUN = function(x) svd(x) %>% .$d) %>%
-  lapply(FUN = function(x) data.frame(ratio = (sum(x[1])/sum(x)), rank = sum(abs(x) > 0.1^5))) %>%
+  lapply(FUN = function(x) data.frame("ratio" = (sum(x[1])/sum(x)), rank = sum(abs(x) > 0.1^5))) %>%
   `names<-`(value = lamb_1_seq) %>%
-  bind_rows(.id = "lambda1")
+  bind_rows(.id = "lambda1") %>%
+  ggplot() +
+  geom_line(aes(x = lambda1, y = ratio, group = 1)) +
+  labs(title = expression("1st singular value / sum of singular values "~lambda[2]~"=1.5 "~delta~"=1, max iter = 300")) +
+  xlab(label = expression(lambda[1]))
 ```
 
 
