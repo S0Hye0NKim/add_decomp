@@ -112,7 +112,7 @@ V <- calc_V(as.matrix(X), Phi)
 ```{r}
 max_iter <- 300
 delta <- 1
-lambda_1 <- 1
+lambda_1 <- 0.01
 lambda_2 <- 1.5
 tol_error <- 0.1
 
@@ -221,6 +221,21 @@ check_ft <- function(x, tau) {
 
 
 ```{r}
+cal_cl_sum <- function(e, tau_seq) {
+  check_loss <- list()
+  for(i in 1:length(tau_seq)) {
+    check_loss[[i]] <- check_ft(e[[i]], tau = tau_seq[i])
+  }
+  
+  result <- lapply(check_loss, FUN = function(x) data.frame(cl_sum = sum(x))) %>%
+    unlist %>% sum
+  return(result)
+}
+```
+
+
+
+```{r}
 names(result$e) <- tau_seq
 
 cl_sum <- list()
@@ -287,6 +302,112 @@ simul_lamb1 %>% lapply(FUN = function(x) x$theta %>% est_gamma(Phi = Phi, theta 
   `names<-`(value = lamb_1_seq) %>%
   bind_rows(.id = "lambda_1")
 ```
+
+
+```{r}
+alpha_hat %>%
+  lapply(FUN = function(x) svd(x) %>% .$d %>% .[1:2] ) %>%
+  lapply(FUN = function(x) data.frame(t(x))) %>%
+  `names<-`(value = lamb_1_seq) %>%
+  bind_rows(.id = "lambda_1") %>%
+  `names<-`(value = c("lambda_1", "first", "second")) %>%
+  gather(data = ., key = "sing_val", value = value, -lambda_1) %>%
+  ggplot() +
+  geom_line(aes(x = lambda_1, y = value, group = sing_val, color = sing_val)) +
+  facet_wrap(~sing_val, scales = "free_y") +
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
+```
+
+
+
+# various lambda_2
+
+```{r}
+lamb_2_seq <- c(seq(from = 0.1, to = 2, by = 0.1), seq(2.5, 5, by = 0.5))
+simul_lamb2 <- list()
+
+for(idx in 1:length(lamb_2_seq)) {
+  simul_lamb2[[idx]] <- add_decomp(delta = 1, lambda_1 = 1, lambda_2 = lamb_2_seq[idx],
+                                   tol_error = 0.1, max_iter = 300, 
+                                   X = as.matrix(X), Y = as.matrix(Y), V = V, Phi = Phi)
+  if((idx %% 2) == 1) print(paste0("iter = ", idx))
+}
+```
+
+
+
+```{r}
+cal_zero <- function(gamma, b) {
+  data <- lapply(gamma, FUN = function(x) which(abs(x) < 0.1^5, arr.ind = TRUE) %>% as_tibble) %>%
+  `names<-`(value= tau_seq) %>%
+  bind_rows(.id = "tau") %>% 
+  group_by(row, col) %>%
+    summarise(zero = n()) %>%
+    filter(zero == b)
+  return(nrow(data))
+}
+```
+
+```{r}
+gamma_hat <- simul_lamb2 %>%
+  lapply(FUN = function(x) x$theta) %>%
+  lapply(FUN = function(x) est_gamma(Phi = Phi, theta = x))
+
+gamma_hat %>%
+  lapply(FUN = function(x) cal_zero(gamma = x, b = b) %>% data.frame(zero_count = .)) %>%
+  `names<-`(value = lamb_2_seq) %>%
+  bind_rows(.id = "lambda_2") %>%
+  mutate(ratio = zero_count/((p+1)*m)) %>%
+  ggplot() +
+  geom_line(aes(x = lambda_2, y = ratio, group = 1)) +
+  xlab(label = expression(lambda[2])) +
+  labs(title = expression("# of zero entry/total entry"~lambda[1]~"=1, "~delta~"=1, max iter = 300"))
+```
+
+```{r}
+extr_e <- simul_lamb2 %>%
+  lapply(FUN = function(x) x$e) 
+
+cl_sum <- list()
+for(i in 1:length(lamb_2_seq)) {
+  cl_sum[[i]] <- data.frame(cl_sum = cal_cl_sum(e = extr_e[[i]], tau_seq = tau_seq))
+}
+```
+
+```{r}
+cl_sum %>%
+  `names<-`(value = lamb_2_seq) %>%
+  bind_rows(.id = "lambda_2") %>%
+  ggplot() +
+  geom_line(aes(x = lambda_2, y = cl_sum, group = 1))
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
