@@ -38,14 +38,28 @@ arma::mat update_eta(double delta, arma::mat sum_VV, arma::mat W, arma::mat Thet
 
 //update_theta.cpp
 //[[Rcpp::export]]
-NumericMatrix update_theta(double delta, double lambda_2, NumericMatrix Eta, NumericMatrix W) {
-  double n = W.nrow();
-  double m = W.ncol();
-  NumericMatrix Theta(n, m);
+arma::mat update_theta(double delta, double lambda_2, double K, arma::mat Eta, arma::mat W) {
+  double n = W.n_rows;
+  double m = W.n_cols;
+  double p = n/K - 1;
+  arma::mat Theta(n, m);
+  
   for(int g=0; g<m; g++) {
-    NumericVector r_g = Eta(_, g) - W(_, g)/delta;
-    NumericVector value = 1 - (lambda_2/(delta * abs(r_g)));
-    Theta(_, g) = ifelse(value >0, value * r_g, 0);
+    arma::vec r_j = Eta.col(g) - (W.col(g)/delta);
+    for(int j=0; j<(p+1); j++) {
+      arma::vec sub_vec = r_j.subvec(K*j, K*(j+1)-1);
+      double accum = 0;
+      for(int i =0; i<K; i++) {
+        accum += sub_vec[i]*sub_vec[i];
+      }
+      double norm = sqrt(accum);
+      double value = 1 - (lambda_2/(delta*norm));
+      if(value >= 0) {
+        Theta.submat(K*j, g, K*(j+1)-1, g) = value * sub_vec;
+      } else {
+        Theta.submat(K*j, g, K*(j+1)-1, g) = arma::vec(K);
+      }
+    }
   }
   return Theta;
 }

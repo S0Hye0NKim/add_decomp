@@ -30,7 +30,7 @@ add_decomp <- function(delta, lambda_1, lambda_2, tol_error, max_iter, X, Y, V, 
                           sum_VU = Sum_Mat(Vu_prod), sum_V, Y, Z = Z_old, sum_VE = Sum_Mat(Ve_prod))
     
     # Process for theta
-    theta_new <- update_theta(delta, lambda_2, Eta = eta_new, W = w_old)
+    theta_new <- update_theta(delta, lambda_2, K = K, Eta = eta_new, W = w_old)
     
     # Process for Z=XA
     sub_process <- update_alpha(delta, lambda_1, Y = Y, X = X, H = eta_new, V = V, E = e_old, U = u_old)
