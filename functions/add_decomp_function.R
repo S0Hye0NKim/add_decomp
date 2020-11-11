@@ -119,3 +119,22 @@ est_gamma <- function(Phi, theta) {
   }
   return(gamma_tau_hat)
 }
+
+# Check loss function
+check_ft <- function(x, tau) {
+  z <- ifelse(x<0, (tau-1)*x, tau*x)
+  return(z)
+}
+
+# Calculate check loss sum
+cal_cl_sum <- function(e, tau_seq) {
+  check_loss <- list()
+  n <- e[[i]] %>% nrow
+  for(i in 1:length(tau_seq)) {
+    check_loss[[i]] <- check_ft(e[[i]], tau = tau_seq[i])
+  }
+  
+  result <- lapply(check_loss, FUN = function(x) data.frame(cl_sum = sum(x))) %>%
+    unlist %>% sum
+  return(result/n)
+}
