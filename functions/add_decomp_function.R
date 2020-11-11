@@ -129,7 +129,7 @@ check_ft <- function(x, tau) {
 # Calculate check loss sum
 cal_cl_sum <- function(e, tau_seq) {
   check_loss <- list()
-  n <- e[[i]] %>% nrow
+  n <- e[[1]] %>% nrow
   for(i in 1:length(tau_seq)) {
     check_loss[[i]] <- check_ft(e[[i]], tau = tau_seq[i])
   }
