@@ -25,24 +25,24 @@ Q}{\\partial\\boldsymbol{\\eta}^2}=\\delta\\sum\_{\\ell}^b\\boldsymbol{V}^{(\\el
 ## 2\. Closed form for theta
 
   
-![\\begin{aligned}\\theta\_j^{(g)^{k+1}}:=\&argmin\_{\\theta^{(g)}}\\sum\_{g=1}^m\\boldsymbol{w}^{(g)^kT}\\theta\_j^{(g)}+
+![\\begin{aligned}\\theta\_j^{(g)^{k+1}}:=\&argmin\_{\\theta\_j^{(g)}\\in\\mathbb{R}^{K}}\\sum\_{g=1}^m\\boldsymbol{w}^{(g)^kT}\\theta\_j^{(g)}+
 \\frac{\\delta}{2}\\sum\_{g=1}^m||\\theta\_j^{(g)} -
 \\eta\_j^{(g)^{k+1}}||\_2^2 +
-\\lambda\_2\\sum\_{g=1}^m||\\theta\_j^{(g)}||\_2\\end{aligned}](https://latex.codecogs.com/png.latex?%5Cbegin%7Baligned%7D%5Ctheta_j%5E%7B%28g%29%5E%7Bk%2B1%7D%7D%3A%3D%26argmin_%7B%5Ctheta%5E%7B%28g%29%7D%7D%5Csum_%7Bg%3D1%7D%5Em%5Cboldsymbol%7Bw%7D%5E%7B%28g%29%5EkT%7D%5Ctheta_j%5E%7B%28g%29%7D%2B%20%5Cfrac%7B%5Cdelta%7D%7B2%7D%5Csum_%7Bg%3D1%7D%5Em%7C%7C%5Ctheta_j%5E%7B%28g%29%7D%20-%20%5Ceta_j%5E%7B%28g%29%5E%7Bk%2B1%7D%7D%7C%7C_2%5E2%20%2B%20%5Clambda_2%5Csum_%7Bg%3D1%7D%5Em%7C%7C%5Ctheta_j%5E%7B%28g%29%7D%7C%7C_2%5Cend%7Baligned%7D
-"\\begin{aligned}\\theta_j^{(g)^{k+1}}:=&argmin_{\\theta^{(g)}}\\sum_{g=1}^m\\boldsymbol{w}^{(g)^kT}\\theta_j^{(g)}+ \\frac{\\delta}{2}\\sum_{g=1}^m||\\theta_j^{(g)} - \\eta_j^{(g)^{k+1}}||_2^2 + \\lambda_2\\sum_{g=1}^m||\\theta_j^{(g)}||_2\\end{aligned}")  
+\\lambda\_2\\sum\_{g=1}^m||\\theta\_j^{(g)}||\_2\\end{aligned}](https://latex.codecogs.com/png.latex?%5Cbegin%7Baligned%7D%5Ctheta_j%5E%7B%28g%29%5E%7Bk%2B1%7D%7D%3A%3D%26argmin_%7B%5Ctheta_j%5E%7B%28g%29%7D%5Cin%5Cmathbb%7BR%7D%5E%7BK%7D%7D%5Csum_%7Bg%3D1%7D%5Em%5Cboldsymbol%7Bw%7D%5E%7B%28g%29%5EkT%7D%5Ctheta_j%5E%7B%28g%29%7D%2B%20%5Cfrac%7B%5Cdelta%7D%7B2%7D%5Csum_%7Bg%3D1%7D%5Em%7C%7C%5Ctheta_j%5E%7B%28g%29%7D%20-%20%5Ceta_j%5E%7B%28g%29%5E%7Bk%2B1%7D%7D%7C%7C_2%5E2%20%2B%20%5Clambda_2%5Csum_%7Bg%3D1%7D%5Em%7C%7C%5Ctheta_j%5E%7B%28g%29%7D%7C%7C_2%5Cend%7Baligned%7D
+"\\begin{aligned}\\theta_j^{(g)^{k+1}}:=&argmin_{\\theta_j^{(g)}\\in\\mathbb{R}^{K}}\\sum_{g=1}^m\\boldsymbol{w}^{(g)^kT}\\theta_j^{(g)}+ \\frac{\\delta}{2}\\sum_{g=1}^m||\\theta_j^{(g)} - \\eta_j^{(g)^{k+1}}||_2^2 + \\lambda_2\\sum_{g=1}^m||\\theta_j^{(g)}||_2\\end{aligned}")  
 
   
 ![\\begin{aligned}\\frac{\\partial Q}{\\partial
-\\theta\_j^{(g)T}}&=w\_j+\\delta\\theta\_j-\\delta\\eta\_j+\\lambda\_2\\frac{\\partial
-||\\theta\_j||\_2}{\\partial\\theta\_j}\\end{aligned}](https://latex.codecogs.com/png.latex?%5Cbegin%7Baligned%7D%5Cfrac%7B%5Cpartial%20Q%7D%7B%5Cpartial%20%5Ctheta_j%5E%7B%28g%29T%7D%7D%26%3Dw_j%2B%5Cdelta%5Ctheta_j-%5Cdelta%5Ceta_j%2B%5Clambda_2%5Cfrac%7B%5Cpartial%20%7C%7C%5Ctheta_j%7C%7C_2%7D%7B%5Cpartial%5Ctheta_j%7D%5Cend%7Baligned%7D
-"\\begin{aligned}\\frac{\\partial Q}{\\partial \\theta_j^{(g)T}}&=w_j+\\delta\\theta_j-\\delta\\eta_j+\\lambda_2\\frac{\\partial ||\\theta_j||_2}{\\partial\\theta_j}\\end{aligned}")  
+\\theta\_j^{(g)T}}&=w\_j+\\delta\\theta\_j^{(g)}-\\delta\\eta\_j^{(g)}+\\lambda\_2\\frac{\\partial
+||\\theta\_j^{(g)}||\_2}{\\partial\\theta\_j^{(g)}}\\end{aligned}](https://latex.codecogs.com/png.latex?%5Cbegin%7Baligned%7D%5Cfrac%7B%5Cpartial%20Q%7D%7B%5Cpartial%20%5Ctheta_j%5E%7B%28g%29T%7D%7D%26%3Dw_j%2B%5Cdelta%5Ctheta_j%5E%7B%28g%29%7D-%5Cdelta%5Ceta_j%5E%7B%28g%29%7D%2B%5Clambda_2%5Cfrac%7B%5Cpartial%20%7C%7C%5Ctheta_j%5E%7B%28g%29%7D%7C%7C_2%7D%7B%5Cpartial%5Ctheta_j%5E%7B%28g%29%7D%7D%5Cend%7Baligned%7D
+"\\begin{aligned}\\frac{\\partial Q}{\\partial \\theta_j^{(g)T}}&=w_j+\\delta\\theta_j^{(g)}-\\delta\\eta_j^{(g)}+\\lambda_2\\frac{\\partial ||\\theta_j^{(g)}||_2}{\\partial\\theta_j^{(g)}}\\end{aligned}")  
 
   
-![\\frac{\\partial||\\theta\_j||\_2}{\\partial\\theta\_j}
-=\\begin{cases}\\theta\_j/||\\theta\_j||&\\quad \\text{if } \\theta\_j
-\\ne 0\\\\\\{u:||u||\\le 1\\}&\\quad\\text{if }
-\\theta\_j=0\\end{cases}](https://latex.codecogs.com/png.latex?%5Cfrac%7B%5Cpartial%7C%7C%5Ctheta_j%7C%7C_2%7D%7B%5Cpartial%5Ctheta_j%7D%20%3D%5Cbegin%7Bcases%7D%5Ctheta_j%2F%7C%7C%5Ctheta_j%7C%7C%26%5Cquad%20%5Ctext%7Bif%20%7D%20%5Ctheta_j%20%5Cne%200%5C%5C%5C%7Bu%3A%7C%7Cu%7C%7C%5Cle%201%5C%7D%26%5Cquad%5Ctext%7Bif%20%7D%20%5Ctheta_j%3D0%5Cend%7Bcases%7D
-"\\frac{\\partial||\\theta_j||_2}{\\partial\\theta_j} =\\begin{cases}\\theta_j/||\\theta_j||&\\quad \\text{if } \\theta_j \\ne 0\\\\\\{u:||u||\\le 1\\}&\\quad\\text{if } \\theta_j=0\\end{cases}")  
+![\\frac{\\partial||\\theta\_j^{(g)}||\_2}{\\partial\\theta\_j^{(g)}}
+=\\begin{cases}\\theta\_j^{(g)}/||\\theta\_j^{(g)}||\_2&\\quad \\text{if
+} \\theta\_j^{(g)} \\ne 0\\\\\\{u:||u||\_2\\le 1\\}&\\quad\\text{if }
+\\theta\_j^{(g)}=0\\end{cases}](https://latex.codecogs.com/png.latex?%5Cfrac%7B%5Cpartial%7C%7C%5Ctheta_j%5E%7B%28g%29%7D%7C%7C_2%7D%7B%5Cpartial%5Ctheta_j%5E%7B%28g%29%7D%7D%20%3D%5Cbegin%7Bcases%7D%5Ctheta_j%5E%7B%28g%29%7D%2F%7C%7C%5Ctheta_j%5E%7B%28g%29%7D%7C%7C_2%26%5Cquad%20%5Ctext%7Bif%20%7D%20%5Ctheta_j%5E%7B%28g%29%7D%20%5Cne%200%5C%5C%5C%7Bu%3A%7C%7Cu%7C%7C_2%5Cle%201%5C%7D%26%5Cquad%5Ctext%7Bif%20%7D%20%5Ctheta_j%5E%7B%28g%29%7D%3D0%5Cend%7Bcases%7D
+"\\frac{\\partial||\\theta_j^{(g)}||_2}{\\partial\\theta_j^{(g)}} =\\begin{cases}\\theta_j^{(g)}/||\\theta_j^{(g)}||_2&\\quad \\text{if } \\theta_j^{(g)} \\ne 0\\\\\\{u:||u||_2\\le 1\\}&\\quad\\text{if } \\theta_j^{(g)}=0\\end{cases}")  
 
 -----
 
@@ -51,12 +51,16 @@ if
 "\\theta_j^{(g)}\\ne0")
 
   
-![\\begin{aligned}&(1+\\frac{\\lambda\_2/\\delta}{||\\theta\_j^{(g)}||})\\theta\_j^{(g)}=\\underbrace{\\eta\_j^{(g)}-\\frac{w\_j^{(g)}}{\\delta}}\_{r\_j^{(g)}}\\\\&(1+\\frac{\\lambda\_2/\\delta}{||\\theta\_j^{(g)}||})||\\theta\_j^{(g)}||=||r\_j^{(g)}||\\\\&\\rightarrow||\\theta\_j^{(g)}||=||r\_j^{(g)}||-\\lambda\_2/\\delta\\end{aligned}](https://latex.codecogs.com/png.latex?%5Cbegin%7Baligned%7D%26%281%2B%5Cfrac%7B%5Clambda_2%2F%5Cdelta%7D%7B%7C%7C%5Ctheta_j%5E%7B%28g%29%7D%7C%7C%7D%29%5Ctheta_j%5E%7B%28g%29%7D%3D%5Cunderbrace%7B%5Ceta_j%5E%7B%28g%29%7D-%5Cfrac%7Bw_j%5E%7B%28g%29%7D%7D%7B%5Cdelta%7D%7D_%7Br_j%5E%7B%28g%29%7D%7D%5C%5C%26%281%2B%5Cfrac%7B%5Clambda_2%2F%5Cdelta%7D%7B%7C%7C%5Ctheta_j%5E%7B%28g%29%7D%7C%7C%7D%29%7C%7C%5Ctheta_j%5E%7B%28g%29%7D%7C%7C%3D%7C%7Cr_j%5E%7B%28g%29%7D%7C%7C%5C%5C%26%5Crightarrow%7C%7C%5Ctheta_j%5E%7B%28g%29%7D%7C%7C%3D%7C%7Cr_j%5E%7B%28g%29%7D%7C%7C-%5Clambda_2%2F%5Cdelta%5Cend%7Baligned%7D
-"\\begin{aligned}&(1+\\frac{\\lambda_2/\\delta}{||\\theta_j^{(g)}||})\\theta_j^{(g)}=\\underbrace{\\eta_j^{(g)}-\\frac{w_j^{(g)}}{\\delta}}_{r_j^{(g)}}\\\\&(1+\\frac{\\lambda_2/\\delta}{||\\theta_j^{(g)}||})||\\theta_j^{(g)}||=||r_j^{(g)}||\\\\&\\rightarrow||\\theta_j^{(g)}||=||r_j^{(g)}||-\\lambda_2/\\delta\\end{aligned}")  
+![\\begin{aligned}&(1+\\frac{\\lambda\_2/\\delta}{||\\theta\_j^{(g)}||\_2})\\theta\_j^{(g)}=\\underbrace{\\eta\_j^{(g)}-\\frac{w\_j^{(g)}}{\\delta}}\_{r\_j^{(g)}}\\\\&(1+\\frac{\\lambda\_2/\\delta}{||\\theta\_j^{(g)}||\_2})||\\theta\_j^{(g)}||\_2=||r\_j^{(g)}||\_2\\\\&\\rightarrow||\\theta\_j^{(g)}||\_2=||r\_j^{(g)}||\_2-\\lambda\_2/\\delta\\end{aligned}](https://latex.codecogs.com/png.latex?%5Cbegin%7Baligned%7D%26%281%2B%5Cfrac%7B%5Clambda_2%2F%5Cdelta%7D%7B%7C%7C%5Ctheta_j%5E%7B%28g%29%7D%7C%7C_2%7D%29%5Ctheta_j%5E%7B%28g%29%7D%3D%5Cunderbrace%7B%5Ceta_j%5E%7B%28g%29%7D-%5Cfrac%7Bw_j%5E%7B%28g%29%7D%7D%7B%5Cdelta%7D%7D_%7Br_j%5E%7B%28g%29%7D%7D%5C%5C%26%281%2B%5Cfrac%7B%5Clambda_2%2F%5Cdelta%7D%7B%7C%7C%5Ctheta_j%5E%7B%28g%29%7D%7C%7C_2%7D%29%7C%7C%5Ctheta_j%5E%7B%28g%29%7D%7C%7C_2%3D%7C%7Cr_j%5E%7B%28g%29%7D%7C%7C_2%5C%5C%26%5Crightarrow%7C%7C%5Ctheta_j%5E%7B%28g%29%7D%7C%7C_2%3D%7C%7Cr_j%5E%7B%28g%29%7D%7C%7C_2-%5Clambda_2%2F%5Cdelta%5Cend%7Baligned%7D
+"\\begin{aligned}&(1+\\frac{\\lambda_2/\\delta}{||\\theta_j^{(g)}||_2})\\theta_j^{(g)}=\\underbrace{\\eta_j^{(g)}-\\frac{w_j^{(g)}}{\\delta}}_{r_j^{(g)}}\\\\&(1+\\frac{\\lambda_2/\\delta}{||\\theta_j^{(g)}||_2})||\\theta_j^{(g)}||_2=||r_j^{(g)}||_2\\\\&\\rightarrow||\\theta_j^{(g)}||_2=||r_j^{(g)}||_2-\\lambda_2/\\delta\\end{aligned}")  
 
   
-![\\begin{aligned}\\theta\_j^{(g)}&=r\_j^{(g)}(1+\\frac{\\lambda\_2/\\delta}{||\\theta\_j^{(g)}||})^{-1}\\\\&=(1-\\frac{\\lambda\_2/\\delta}{||r\_j^{(g)}||})r\_j^{(g)}\\end{aligned}](https://latex.codecogs.com/png.latex?%5Cbegin%7Baligned%7D%5Ctheta_j%5E%7B%28g%29%7D%26%3Dr_j%5E%7B%28g%29%7D%281%2B%5Cfrac%7B%5Clambda_2%2F%5Cdelta%7D%7B%7C%7C%5Ctheta_j%5E%7B%28g%29%7D%7C%7C%7D%29%5E%7B-1%7D%5C%5C%26%3D%281-%5Cfrac%7B%5Clambda_2%2F%5Cdelta%7D%7B%7C%7Cr_j%5E%7B%28g%29%7D%7C%7C%7D%29r_j%5E%7B%28g%29%7D%5Cend%7Baligned%7D
-"\\begin{aligned}\\theta_j^{(g)}&=r_j^{(g)}(1+\\frac{\\lambda_2/\\delta}{||\\theta_j^{(g)}||})^{-1}\\\\&=(1-\\frac{\\lambda_2/\\delta}{||r_j^{(g)}||})r_j^{(g)}\\end{aligned}")  
+![\\begin{aligned}&||\\theta\_j^{(g)}||\_2=||r\_j^{(g)}||\_2-\\lambda\_2/\\delta\>0\\\\&\\rightarrow||r\_j^{(g)}||\_2\>\\frac{\\lambda\_2}{\\delta}\\end{aligned}](https://latex.codecogs.com/png.latex?%5Cbegin%7Baligned%7D%26%7C%7C%5Ctheta_j%5E%7B%28g%29%7D%7C%7C_2%3D%7C%7Cr_j%5E%7B%28g%29%7D%7C%7C_2-%5Clambda_2%2F%5Cdelta%3E0%5C%5C%26%5Crightarrow%7C%7Cr_j%5E%7B%28g%29%7D%7C%7C_2%3E%5Cfrac%7B%5Clambda_2%7D%7B%5Cdelta%7D%5Cend%7Baligned%7D
+"\\begin{aligned}&||\\theta_j^{(g)}||_2=||r_j^{(g)}||_2-\\lambda_2/\\delta\>0\\\\&\\rightarrow||r_j^{(g)}||_2\>\\frac{\\lambda_2}{\\delta}\\end{aligned}")  
+
+  
+![\\begin{aligned}\\theta\_j^{(g)}&=r\_j^{(g)}(1+\\frac{\\lambda\_2/\\delta}{||\\theta\_j^{(g)}||\_2})^{-1}\\\\&=(1-\\frac{\\lambda\_2/\\delta}{||r\_j^{(g)}||\_2})r\_j^{(g)}\\end{aligned}](https://latex.codecogs.com/png.latex?%5Cbegin%7Baligned%7D%5Ctheta_j%5E%7B%28g%29%7D%26%3Dr_j%5E%7B%28g%29%7D%281%2B%5Cfrac%7B%5Clambda_2%2F%5Cdelta%7D%7B%7C%7C%5Ctheta_j%5E%7B%28g%29%7D%7C%7C_2%7D%29%5E%7B-1%7D%5C%5C%26%3D%281-%5Cfrac%7B%5Clambda_2%2F%5Cdelta%7D%7B%7C%7Cr_j%5E%7B%28g%29%7D%7C%7C_2%7D%29r_j%5E%7B%28g%29%7D%5Cend%7Baligned%7D
+"\\begin{aligned}\\theta_j^{(g)}&=r_j^{(g)}(1+\\frac{\\lambda_2/\\delta}{||\\theta_j^{(g)}||_2})^{-1}\\\\&=(1-\\frac{\\lambda_2/\\delta}{||r_j^{(g)}||_2})r_j^{(g)}\\end{aligned}")  
 
 -----
 
@@ -68,22 +72,22 @@ if ![\\theta=0](https://latex.codecogs.com/png.latex?%5Ctheta%3D0
 }||u||\_2\\le1](https://latex.codecogs.com/png.latex?w_j%5E%7B%28g%29%7D-%5Cdelta%5Ceta_j%5E%7B%28g%29%7D%2B%5Clambda_2u%3D0%5Cquad%5Ctext%7Bwhere%20%7D%7C%7Cu%7C%7C_2%5Cle1
 "w_j^{(g)}-\\delta\\eta_j^{(g)}+\\lambda_2u=0\\quad\\text{where }||u||_2\\le1")  
   
-![\\begin{aligned}\\frac{\\lambda\_2}{\\delta}u&=\\eta\_j^{(g)}-\\frac{w\_j^{(g)}}{\\delta}=r\_j^{(g)}\\\\\\frac{\\lambda\_2}{\\delta}||u||&=||\\eta\_j^{(g)}-\\frac{w\_j^{(g)}}{\\delta}||\\le\\frac{\\lambda\_2}{\\delta}\\end{aligned}](https://latex.codecogs.com/png.latex?%5Cbegin%7Baligned%7D%5Cfrac%7B%5Clambda_2%7D%7B%5Cdelta%7Du%26%3D%5Ceta_j%5E%7B%28g%29%7D-%5Cfrac%7Bw_j%5E%7B%28g%29%7D%7D%7B%5Cdelta%7D%3Dr_j%5E%7B%28g%29%7D%5C%5C%5Cfrac%7B%5Clambda_2%7D%7B%5Cdelta%7D%7C%7Cu%7C%7C%26%3D%7C%7C%5Ceta_j%5E%7B%28g%29%7D-%5Cfrac%7Bw_j%5E%7B%28g%29%7D%7D%7B%5Cdelta%7D%7C%7C%5Cle%5Cfrac%7B%5Clambda_2%7D%7B%5Cdelta%7D%5Cend%7Baligned%7D
-"\\begin{aligned}\\frac{\\lambda_2}{\\delta}u&=\\eta_j^{(g)}-\\frac{w_j^{(g)}}{\\delta}=r_j^{(g)}\\\\\\frac{\\lambda_2}{\\delta}||u||&=||\\eta_j^{(g)}-\\frac{w_j^{(g)}}{\\delta}||\\le\\frac{\\lambda_2}{\\delta}\\end{aligned}")  
+![\\begin{aligned}\\frac{\\lambda\_2}{\\delta}u&=\\eta\_j^{(g)}-\\frac{w\_j^{(g)}}{\\delta}=r\_j^{(g)}\\\\\\frac{\\lambda\_2}{\\delta}||u||\_2&=||\\eta\_j^{(g)}-\\frac{w\_j^{(g)}}{\\delta}||\_2=||r\_j^{(g)}||\_2\\le\\frac{\\lambda\_2}{\\delta}\\end{aligned}](https://latex.codecogs.com/png.latex?%5Cbegin%7Baligned%7D%5Cfrac%7B%5Clambda_2%7D%7B%5Cdelta%7Du%26%3D%5Ceta_j%5E%7B%28g%29%7D-%5Cfrac%7Bw_j%5E%7B%28g%29%7D%7D%7B%5Cdelta%7D%3Dr_j%5E%7B%28g%29%7D%5C%5C%5Cfrac%7B%5Clambda_2%7D%7B%5Cdelta%7D%7C%7Cu%7C%7C_2%26%3D%7C%7C%5Ceta_j%5E%7B%28g%29%7D-%5Cfrac%7Bw_j%5E%7B%28g%29%7D%7D%7B%5Cdelta%7D%7C%7C_2%3D%7C%7Cr_j%5E%7B%28g%29%7D%7C%7C_2%5Cle%5Cfrac%7B%5Clambda_2%7D%7B%5Cdelta%7D%5Cend%7Baligned%7D
+"\\begin{aligned}\\frac{\\lambda_2}{\\delta}u&=\\eta_j^{(g)}-\\frac{w_j^{(g)}}{\\delta}=r_j^{(g)}\\\\\\frac{\\lambda_2}{\\delta}||u||_2&=||\\eta_j^{(g)}-\\frac{w_j^{(g)}}{\\delta}||_2=||r_j^{(g)}||_2\\le\\frac{\\lambda_2}{\\delta}\\end{aligned}")  
 
 -----
 
   
-![\\therefore\\hat{\\theta}^{(g)}\_j=(1-\\frac{\\lambda\_2/\\delta}{||r\_j^{(g)}||})\_+r\_j^{(g)}\\quad\\text{where
-}r\_j^{(g)}=\\eta\_j^{(g)}-w\_j^{(g)}/\\delta](https://latex.codecogs.com/png.latex?%5Ctherefore%5Chat%7B%5Ctheta%7D%5E%7B%28g%29%7D_j%3D%281-%5Cfrac%7B%5Clambda_2%2F%5Cdelta%7D%7B%7C%7Cr_j%5E%7B%28g%29%7D%7C%7C%7D%29_%2Br_j%5E%7B%28g%29%7D%5Cquad%5Ctext%7Bwhere%20%7Dr_j%5E%7B%28g%29%7D%3D%5Ceta_j%5E%7B%28g%29%7D-w_j%5E%7B%28g%29%7D%2F%5Cdelta
-"\\therefore\\hat{\\theta}^{(g)}_j=(1-\\frac{\\lambda_2/\\delta}{||r_j^{(g)}||})_+r_j^{(g)}\\quad\\text{where }r_j^{(g)}=\\eta_j^{(g)}-w_j^{(g)}/\\delta")  
+![\\therefore\\hat{\\theta}^{(g)}\_j=(1-\\frac{\\lambda\_2/\\delta}{||r\_j^{(g)}||\_2})\_+r\_j^{(g)}\\quad\\text{where
+}r\_j^{(g)}=\\eta\_j^{(g)}-w\_j^{(g)}/\\delta](https://latex.codecogs.com/png.latex?%5Ctherefore%5Chat%7B%5Ctheta%7D%5E%7B%28g%29%7D_j%3D%281-%5Cfrac%7B%5Clambda_2%2F%5Cdelta%7D%7B%7C%7Cr_j%5E%7B%28g%29%7D%7C%7C_2%7D%29_%2Br_j%5E%7B%28g%29%7D%5Cquad%5Ctext%7Bwhere%20%7Dr_j%5E%7B%28g%29%7D%3D%5Ceta_j%5E%7B%28g%29%7D-w_j%5E%7B%28g%29%7D%2F%5Cdelta
+"\\therefore\\hat{\\theta}^{(g)}_j=(1-\\frac{\\lambda_2/\\delta}{||r_j^{(g)}||_2})_+r_j^{(g)}\\quad\\text{where }r_j^{(g)}=\\eta_j^{(g)}-w_j^{(g)}/\\delta")  
 
   
 ![\\begin{aligned}\\frac{\\partial^2 Q}{\\partial
-\\theta\_j^{2(g)T}}&=\\underbrace{\\delta+\\begin{cases}1/||\\theta\_j||&\\quad\\text{if
+\\theta\_j^{2(g)T}}&=\\underbrace{\\delta+\\begin{cases}1/||\\theta\_j||\_2&\\quad\\text{if
 } \\theta\_j \\ne 0\\\\0&\\quad\\text{if }
-\\theta\_j=0\\end{cases}}\_{\>0}\\end{aligned}](https://latex.codecogs.com/png.latex?%5Cbegin%7Baligned%7D%5Cfrac%7B%5Cpartial%5E2%20Q%7D%7B%5Cpartial%20%5Ctheta_j%5E%7B2%28g%29T%7D%7D%26%3D%5Cunderbrace%7B%5Cdelta%2B%5Cbegin%7Bcases%7D1%2F%7C%7C%5Ctheta_j%7C%7C%26%5Cquad%5Ctext%7Bif%20%7D%20%5Ctheta_j%20%5Cne%200%5C%5C0%26%5Cquad%5Ctext%7Bif%20%7D%20%5Ctheta_j%3D0%5Cend%7Bcases%7D%7D_%7B%3E0%7D%5Cend%7Baligned%7D
-"\\begin{aligned}\\frac{\\partial^2 Q}{\\partial \\theta_j^{2(g)T}}&=\\underbrace{\\delta+\\begin{cases}1/||\\theta_j||&\\quad\\text{if } \\theta_j \\ne 0\\\\0&\\quad\\text{if } \\theta_j=0\\end{cases}}_{\>0}\\end{aligned}")  
+\\theta\_j=0\\end{cases}}\_{\>0}\\end{aligned}](https://latex.codecogs.com/png.latex?%5Cbegin%7Baligned%7D%5Cfrac%7B%5Cpartial%5E2%20Q%7D%7B%5Cpartial%20%5Ctheta_j%5E%7B2%28g%29T%7D%7D%26%3D%5Cunderbrace%7B%5Cdelta%2B%5Cbegin%7Bcases%7D1%2F%7C%7C%5Ctheta_j%7C%7C_2%26%5Cquad%5Ctext%7Bif%20%7D%20%5Ctheta_j%20%5Cne%200%5C%5C0%26%5Cquad%5Ctext%7Bif%20%7D%20%5Ctheta_j%3D0%5Cend%7Bcases%7D%7D_%7B%3E0%7D%5Cend%7Baligned%7D
+"\\begin{aligned}\\frac{\\partial^2 Q}{\\partial \\theta_j^{2(g)T}}&=\\underbrace{\\delta+\\begin{cases}1/||\\theta_j||_2&\\quad\\text{if } \\theta_j \\ne 0\\\\0&\\quad\\text{if } \\theta_j=0\\end{cases}}_{\>0}\\end{aligned}")  
 
 ## 3\. Closed form for alpha
 
