@@ -6,7 +6,7 @@ output: pdf_document
 ---
 
 # packages
-```{r warning = FALSE, message = FALSE, eval = FALSE}
+```{r warning = FALSE, message = FALSE}
 library(tidyverse)
 library(ggplot2)
 library(Matrix)
@@ -112,8 +112,8 @@ V <- calc_V(as.matrix(X), Phi)
 ```{r}
 max_iter <- 300
 delta <- 1
-lambda_1 <- 0.01
-lambda_2 <- 1.5
+lambda_1 <- 0.1
+lambda_2 <- 0.1
 tol_error <- 0.1
 
 start <- Sys.time()
@@ -209,60 +209,32 @@ lapply(gamma_hat, FUN = function(x) data.frame(col = rep(1:m, each = (p+1)),
 
 # Check loss sum
 
-$$\sum_\ell^{b}\sum_{g=1}^m\sum_{i=1}^n\rho_\tau(Y_i^{(g)}-x_i^T[\alpha^{(g)}+\gamma^{(g)}(\tau)])\\=\sum_\ell^{b}\sum_{g=1}^m\sum_{i=1}^n\rho_\tau(e_i^{(\ell)(g)})$$
+$$\sum_\ell^{b}\sum_{g=1}^m\sum_{i=1}^n\frac{1}{n}\rho_\tau(Y_i^{(g)}-x_i^T[\alpha^{(g)}+\gamma^{(g)}(\tau)])\\=\sum_\ell^{b}\sum_{g=1}^m\sum_{i=1}^n\frac{1}{n}\rho_\tau(e_i^{(\ell)(g)})$$
 
 
 ```{r}
-check_ft <- function(x, tau) {
-  z <- ifelse(x<0, (tau-1)*x, tau*x)
-  return(z)
-}
-```
-
-
-```{r}
-cal_cl_sum <- function(e, tau_seq) {
-  check_loss <- list()
-  for(i in 1:length(tau_seq)) {
-    check_loss[[i]] <- check_ft(e[[i]], tau = tau_seq[i])
-  }
-  
-  result <- lapply(check_loss, FUN = function(x) data.frame(cl_sum = sum(x))) %>%
-    unlist %>% sum
-  return(result)
-}
-```
-
-
-
-```{r}
-names(result$e) <- tau_seq
-
-cl_sum <- list()
-for(i in 1:length(result$e)) {
-  cl_sum[[i]] <- check_ft(result$e[[i]], tau = tau_seq[i])
-}
-
-lapply(cl_sum, FUN = function(x) data.frame(cl_sum = apply(x, MARGIN = 2, FUN = sum) %>% sum)) %>%
-  `names<-`(value = tau_seq) %>%
-  bind_rows(.id = "tau") %>%
-  summarise(cl_sum = sum(cl_sum))
+cal_cl_sum(result$e, tau_seq)
 ```
 
 ```{r}
 est_beta <- lapply(gamma_hat, FUN = function(x) x + result$alpha)
 est_e <- lapply(est_beta, FUN = function(x) as.matrix(Y) - X %*% x)
 
-cl_sum <- list()
-for(i in 1:length(est_e)) {
-  cl_sum[[i]] <- check_ft(est_e[[i]], tau = tau_seq[i])
+cal_cl_sum(est_e, tau_seq)
+  
+```
+
+
+
+```{r}
+Y_list <- list()
+for(i in 1:length(tau_seq)) {
+  Y_list[[i]] <- as.matrix(Y)
 }
 
-lapply(cl_sum, FUN = function(x) data.frame(cl_sum = apply(x, MARGIN = 2, FUN = sum) %>% sum)) %>%
-  `names<-`(value = tau_seq) %>%
-  bind_rows(.id = "tau") %>%
-  summarise(cl_sum = sum(cl_sum))
+cal_cl_sum(Y_list, tau_seq)
 ```
+
 
 
 
@@ -383,7 +355,36 @@ cl_sum %>%
 ```
 
 
+# Two way
 
+```{r}
+lamb_1_seq <- seq(from = 0.1, to = 1.6, by = 0.2)
+lamb_2_seq <- seq(from = 0.5, to = 2.5, by = 0.5)
+
+
+simul_2_way <- list()
+for(idx_1 in 1:length(lamb_1_seq)) {
+  simul_2_way[[idx_1]] <- list()
+  for(idx_2 in 1:length(lamb_2_seq)) {
+    simul_2_way[[idx_1]][[idx_2]] <- add_decomp(delta = 1, lambda_1 = lamb_1_seq[idx_1], 
+                                                lambda_2 = lamb_2_seq[idx_2], tol_error = 0.1, 
+                                                max_iter = 300, X = as.matrix(X), Y = as.matrix(Y), 
+                                                V = V, Phi = Phi)
+  }
+}
+```
+
+
+```{r}
+simul_2_way %>%
+  lapply(FUN = function(x) lapply(x, FUN = function(y) cal_cl_sum(e = y$e, tau_seq = tau_seq) %>% data.frame(cl_sum = .))) %>%
+  lapply(FUN = function(x) x %>% `names<-`(value= lamb_2_seq) %>% bind_rows(.id = "lambda_2")) %>%
+  `names<-`(value = lamb_1_seq) %>%
+  bind_rows(.id = "lambda_1") %>%
+  ggplot() +
+  geom_tile(aes(x = lambda_1, y = lambda_2, fill = cl_sum)) +
+  labs(title = "check loss sum when max iter = 300")
+```
 
 
 
