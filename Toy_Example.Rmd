@@ -38,11 +38,11 @@ For toy example, I will use n = 300, p = 50, g = 20.
 
 ```{r}
 set.seed(0)
-n <- 300
-m <- 15
-p <- 20
+n <- 400
+m <- 10
+p <- 30
 #num_nz <- 15   #round((p+1)*m*(1/5)) 
-b <- 6
+b <- 21
 num_rank <- 5
 
 X <- matrix(rnorm(n*p, mean = 0, sd = 1), nrow = n) %>% cbind(1, .)   #add intercept term in X
@@ -60,7 +60,7 @@ for(i in 1:m) {
   sp_mat[row_ind[i], col_ind[i]] <- rnorm(1, mean = 5, sd = 0.1)
 }
 num_zero <- which(sp_mat==0, arr.ind = TRUE) %>% nrow
-num_nz <- (m+1)*p - num_zero
+num_nz <- (p+1)*m - num_zero
 
 LR_mat <- matrix(rnorm((p+1)*m, mean = 1, sd = 0.1), ncol = m) # make low rank matrix using SVD
 SVD <- svd(LR_mat)
@@ -99,9 +99,9 @@ $$\rho_\tau(x) = (\tau - \mathbb{I}(x<0))x$$
 K <- 10
 
 tau_seq <- seq(from = 0.4, to = 0.6, length.out = b)
-knots_seq <- seq(from = tau_seq[1] - 0.02, to = tau_seq[b] + 0.02, length.out = K - 2) %>% .[-c(1, (K - 2))]
+knots_seq <- seq(from = tau_seq[1] - 0.02, to = tau_seq[b] + 0.02, length.out = K) %>% .[-c(1, (K))]
 boundary <- c(tau_seq[1] - 0.02, tau_seq[b] + 0.02)
-Phi <- bs(tau_seq, knots = knots_seq, degree = 3, intercept = TRUE, Boundary.knots = boundary)
+Phi <- bs(tau_seq, knots = knots_seq, degree = 1, intercept = TRUE, Boundary.knots = boundary)
 
 attr(Phi, "knots")
 ```
@@ -114,6 +114,7 @@ $$\begin{aligned}\boldsymbol{v}_i^{(\ell)} &= (\boldsymbol{x}_i \otimes \Phi(\ta
 
 ```{r}
 sourceCpp("functions/add_decomp_function.cpp")
+source("https://raw.githubusercontent.com/S0Hye0NKim/add_decomp/master/functions/add_decomp_function.R")
 ```
 
 ```{r}
@@ -142,15 +143,15 @@ $$\begin{aligned}\boldsymbol{Y}&=\boldsymbol{XA}+\boldsymbol{X\Gamma}(\tau)\\&=\
 
 
 ```{r}
-add_decomp <- function(delta, lambda_1, lambda_2, tol_error, max_iter) {
+add_decomp <- function(delta, lambda_1, lambda_2, tol_error, max_iter, X, Y, V, Phi) {
   # delta = step size
   # lambda_1 = low rank penalty
   # lambda_2 = sparse penalty
   
   # initial value
-  eta_old <- matrix(1, nrow = (p+1)*K, ncol = m) 
+  eta_old <- matrix(0.01, nrow = (p+1)*K, ncol = m) 
   theta_old <- eta_old
-  alpha_old <- matrix(0, nrow = p+1, ncol = m)
+  alpha_old <- matrix(0.8, nrow = p+1, ncol = m)
   Z_old <- prod_AB(A = X, B = alpha_old, A_t = FALSE, B_t = FALSE)
   e_old <- list()
   for(l in 1:b) {e_old[[l]] <- Y - Z_old - prod_AB(A = V[[l]], B = eta_old, A_t = FALSE, B_t = FALSE)}
@@ -172,9 +173,9 @@ add_decomp <- function(delta, lambda_1, lambda_2, tol_error, max_iter) {
     Ve_prod <- mapply(function(x,y) prod_AB(x, y, A_t = TRUE, B_t = FALSE), V, e_old, SIMPLIFY = FALSE)
     eta_new <- update_eta(delta, sum_VV, W = w_old, Theta = theta_old, 
                           sum_VU = Sum_Mat(Vu_prod), sum_V, Y, Z = Z_old, sum_VE = Sum_Mat(Ve_prod))
-
+    
     # Process for theta
-    theta_new <- update_theta(delta, lambda_2, Eta = eta_new, W = w_old)
+    theta_new <- update_theta(delta, lambda_2, K = K, Eta = eta_new, W = w_old)
     
     # Process for Z=XA
     sub_process <- update_alpha(delta, lambda_1, Y = Y, X = X, H = eta_new, V = V, E = e_old, U = u_old)
@@ -186,10 +187,10 @@ add_decomp <- function(delta, lambda_1, lambda_2, tol_error, max_iter) {
     
     # Process for multiplier u
     u_new <- update_multi(U_old = u_old, W_old = w_old, delta, Y, X, A = alpha_new, H = eta_new, 
-                           Theta = theta_new, V = V, E = e_new, is_u = TRUE)
+                          Theta = theta_new, V = V, E = e_new, is_u = TRUE)
     # Process for multiplier w
     w_new <- update_multi(U_old = u_old, W_old = w_old, delta, Y, X, A = alpha_new, H = eta_new, 
-                           Theta = theta_new, V = V, E = e_new, is_u = FALSE) %>% .[[1]]
+                          Theta = theta_new, V = V, E = e_new, is_u = FALSE) %>% .[[1]]
     
     # Update iteration error
     iter_error[iter, "eta"] <- calc_err(list(eta_old), list(eta_new))
@@ -253,13 +254,14 @@ check_sp_table <- function(true, est, tol = 0.1^5, table = FALSE, nnz = num_nz, 
 
 
 ```{r}
-max_iter <- 50
-delta <- 0.05
-lambda_1 <- 0.25
-lambda_2 <- 0.49
+max_iter <- 300
+delta <- 1
+lambda_1 <- 0.61
+lambda_2 <- 1.9
 tol_error <- 0.1
 
-result <- add_decomp(delta, lambda_1, lambda_2, tol_error, max_iter)
+
+result <- add_decomp(delta, lambda_1, lambda_2, tol_error, max_iter, X = X, Y = Y, V = V, Phi = Phi)
 ```
 
 
@@ -362,12 +364,11 @@ sp_heat <- data.frame(col = rep(1:m, each = (p+1)),
     axis.title.y = element_blank(), 
     axis.text.y = element_blank(), 
     axis.ticks.y = element_blank()) +
-  ggtitle("sp_mat") +
-  coord_fixed(ratio = 1.3)
+  ggtitle(expression(Gamma~"("~0.5~")")) 
 
 gamma_heat <- data.frame(col = rep(1:m, each = (p+1)), 
            row = rep(1:(p+1), m),
-           value = as.vector(gamma_tau_hat[[3]])) %>%
+           value = as.vector(gamma_tau_hat[[11]])) %>%
   mutate(value = ifelse(abs(value) < 0.1^5, 0, value)) %>%
   ggplot(aes(x = col, y = -row, fill = value)) +
   geom_tile(color = "grey") +
@@ -384,8 +385,7 @@ gamma_heat <- data.frame(col = rep(1:m, each = (p+1)),
     axis.title.y = element_blank(), 
     axis.text.y = element_blank(), 
     axis.ticks.y = element_blank()) +
-  ggtitle(expression(Gamma~"("~tau[3]~")")) +
-  coord_fixed(ratio = 1.3)
+  ggtitle(expression(Gamma~"("~tau[11]~")"))
 
 
 common_zero_heat <- lapply(gamma_tau_hat, FUN = function(x) data.frame(col = rep(1:m, each = (p+1)),
@@ -393,13 +393,13 @@ common_zero_heat <- lapply(gamma_tau_hat, FUN = function(x) data.frame(col = rep
                                                    value = as.vector(x))) %>%
   `names<-`(tau_seq) %>%
   bind_rows(.id = "tau") %>%
-  mutate(is_nonzero = ifelse(abs(value) < 0.1^5, 0, 1)) %>%
+  mutate(nonzero = ifelse(abs(value) < 0.1^5, 0, 1)) %>%
   group_by(col, row) %>%
-  summarise(is_nonzero = mean(is_nonzero)) %>%
-  mutate(is_nonzero = ifelse(is_nonzero == 0, 0, 1) %>% as.character) %>%
-  ggplot(aes(x = col, y = -row, fill = is_nonzero)) +
+  summarise(nonzero = mean(nonzero)) %>%
+  mutate(nonzero = ifelse(nonzero == 0, 0, 1) %>% as.character) %>%
+  ggplot(aes(x = col, y = -row, fill = nonzero)) +
   geom_tile(color = "grey") +
-  scale_fill_manual(values = c("white", "black")) + 
+  scale_fill_manual(values = c("white", "black"), name = "entry", label = c("zero", "non-zero")) + 
   theme_bw() +
   theme(axis.line = element_blank(),
     panel.grid.major = element_blank(),
@@ -412,12 +412,31 @@ common_zero_heat <- lapply(gamma_tau_hat, FUN = function(x) data.frame(col = rep
     axis.title.y = element_blank(), 
     axis.text.y = element_blank(), 
     axis.ticks.y = element_blank()) +
-  ggtitle(expression("all of"~Gamma~"("~tau[l]~")")) +
-  coord_fixed(ratio = 1.3)
+  ggtitle(expression(Gamma~"("~tau[l]~")")) 
 
 grid.arrange(sp_heat, gamma_heat, nrow = 1)
 grid.arrange(sp_heat, common_zero_heat, nrow = 1)
 ```
+
+
+```{r}
+idx_nz_true <- which(sp_mat != 0, arr.ind = TRUE) %>% data.frame()
+
+gamma_tau_hat %>%
+  lapply(FUN = function(x) x[idx_nz_true$row, idx_nz_true$col] %>% diag %>%
+           data.frame(row = idx_nz_true$row, col = idx_nz_true$col, value = . )) %>%
+  `names<-`(value = tau_seq) %>%
+  bind_rows(.id = "tau") %>%
+  unite(col = index, row, col, sep = ",") %>%
+  mutate(index = paste0("(", index, ")"), tau = as.numeric(tau)) %>%
+  ggplot() +
+  geom_line(aes(x = tau, y = value, group = index, color = index)) +
+  labs(x = expression(tau[l]), title = expression(gamma~"("~tau[l]~")"))
+```
+
+
+
+
 
 
 ```{r}
@@ -435,6 +454,19 @@ Y_hat <- X %*% beta_hat
 norm(Y - Y_hat, "F")/norm(Y, "F")
 ```
 
+```{r}
+cal_cl_sum(result$e, tau_seq)
+```
+
+
+```{r}
+Y_list <- list()
+for(i in 1:length(tau_seq)) {
+  Y_list[[i]] <- as.matrix(Y)
+}
+
+cal_cl_sum(Y_list, tau_seq)
+```
 
 
 
