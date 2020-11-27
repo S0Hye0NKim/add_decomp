@@ -1,12 +1,12 @@
-add_decomp <- function(delta, lambda_1, lambda_2, tol_error, max_iter, X, Y, V, Phi) {
+add_decomp <- function(delta, lambda_1, lambda_2, tol_error, max_iter, X, Y, V, Phi, theta_0, alpha_0) {
   # delta = step size
   # lambda_1 = low rank penalty
   # lambda_2 = sparse penalty
   
   # initial value
-  eta_old <- matrix(0.01, nrow = (p+1)*K, ncol = m) 
+  eta_old <- theta_0
   theta_old <- eta_old
-  alpha_old <- matrix(0.01, nrow = p+1, ncol = m)
+  alpha_old <- alpha_0
   Z_old <- prod_AB(A = X, B = alpha_old, A_t = FALSE, B_t = FALSE)
   e_old <- list()
   for(l in 1:b) {e_old[[l]] <- Y - Z_old - prod_AB(A = V[[l]], B = eta_old, A_t = FALSE, B_t = FALSE)}
