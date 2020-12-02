@@ -107,6 +107,15 @@ attr(Phi, "knots")
 ```
 
 
+```{r}
+K <- 10
+tau_seq <- seq(from = 0.4, to = 0.6, length.out = b)
+
+knots_seq <- seq(0.39, 0.61, length.out = K)
+Phi <- fda::bsplineS(tau_seq, breaks= knots_seq, norder=2, nderiv=0, returnMatrix=FALSE)
+```
+
+
 $$\begin{aligned}\boldsymbol{v}_i^{(\ell)} &= (\boldsymbol{x}_i \otimes \Phi(\tau_{\ell}))^T\\ &=(\Phi(\tau_\ell)^T, x_{i1}\Phi(\tau_\ell)^T, \dots, x_{ip}\Phi(\tau_\ell)^T) \\ &\in \mathbb{R}^{(p+1)K}\end{aligned}$$
 
 ### 1-3. New design matrix for regional quantile
@@ -142,7 +151,7 @@ $$\begin{aligned}\boldsymbol{Y}&=\boldsymbol{XA}+\boldsymbol{X\Gamma}(\tau)\\&=\
 
 
 
-```{r}
+```{r eval = FALSE}
 add_decomp <- function(delta, lambda_1, lambda_2, tol_error, max_iter, X, Y, V, Phi) {
   # delta = step size
   # lambda_1 = low rank penalty
@@ -226,7 +235,7 @@ add_decomp <- function(delta, lambda_1, lambda_2, tol_error, max_iter, X, Y, V, 
 
 $$\hat{\Gamma}_{11}(\tau_1)=\cdots=\hat{\Gamma}_{11}(\tau_\ell)=0=\Gamma_{11}(\tau)$$
 
-```{r}
+```{r eval = FALSE}
 check_sp_table <- function(true, est, tol = 0.1^5, table = FALSE, nnz = num_nz, nz = num_zero) {
   # check sparsity pattern of true and est matrix
   zero_idx_true <- which(abs(true) < tol, arr.ind = TRUE) %>% as_tibble
@@ -251,17 +260,60 @@ check_sp_table <- function(true, est, tol = 0.1^5, table = FALSE, nnz = num_nz, 
 }
 ```
 
+## 2-1. Initial value
+
+```{r}
+lasso_coef <- matrix(nrow = p+1, ncol = m)
+for(g in 1:m) {
+  cv.lasso <- cv.glmnet(x = X[, -1], y = Y[, g], alpha = 1, type.measure = "mae")
+  lasso_model <- glmnet(X[, -1], Y[, g], family = "gaussian", alpha = 1, lambda = cv.lasso$lambda.min)
+  lasso_coef[, g] <- c(lasso_model$a0, as.vector(lasso_model$beta))
+}
+
+
+theta_init <- matrix(nrow = (p+1)*K, ncol = m)
+for(g in 1:m) {
+  for(j in 0:p) {
+    theta_init[((j*K)+1):((j+1)*K), g] <- lasso_coef[j+1, g]
+  }
+}
+
+Y_modified <- Y - X%*%lasso_coef
+
+lin_model <- lm(Y_modified~., data = data.frame(X[, -1]))
+alpha_init <- lin_model$coefficients
+
+
+```
 
 
 ```{r}
 max_iter <- 300
 delta <- 1
-lambda_1 <- 0.61
-lambda_2 <- 1.9
+lambda_1 <- 4
+lambda_2 <- 20
 tol_error <- 0.1
+#theta_init <- matrix(0.01, nrow = (p+1)*K, ncol = m)
+#alpha_init <- matrix(0.8, nrow = p+1, ncol = m)
 
 
-result <- add_decomp(delta, lambda_1, lambda_2, tol_error, max_iter, X = X, Y = Y, V = V, Phi = Phi)
+result <- add_decomp(delta, lambda_1, lambda_2, tol_error, max_iter, X = X, Y = Y, V = V, Phi = Phi, 
+                     theta_0 = theta_init, alpha_0 = alpha_init)
+```
+
+
+```{r}
+theta_init <- matrix(0, nrow = (p+1)*K, ncol = m)
+
+nz_idx <- which(sp_mat != 0, arr.ind = TRUE)
+for(i in 1:nrow(nz_idx)) {
+  j <- nz_idx[i, "row"] - 1
+  g <- nz_idx[i, "col"]
+  theta_init[(j*K +1):((j+1)*K), g] <- 5
+}
+
+result <- add_decomp(delta, lambda_1, lambda_2, tol_error, max_iter,  X = X, Y = Y, V = V, Phi = Phi,
+                     theta_0 = theta_init, alpha_0 = LR_mat)
 ```
 
 
@@ -329,6 +381,7 @@ for(l in 1:b) {
   }
 }
 ```
+
 
 
 ### sparsity pattern check
@@ -422,16 +475,21 @@ grid.arrange(sp_heat, common_zero_heat, nrow = 1)
 ```{r}
 idx_nz_true <- which(sp_mat != 0, arr.ind = TRUE) %>% data.frame()
 
+idx_nz_est <- lapply(gamma_tau_hat, FUN = function(x) which(abs(x) > 0.1^5, arr.ind = TRUE) %>% as_tibble) %>%
+    bind_rows (.id = "tau") %>%
+    group_by(row, col) %>%
+    summarise(zero = n()) 
+
 gamma_tau_hat %>%
-  lapply(FUN = function(x) x[idx_nz_true$row, idx_nz_true$col] %>% diag %>%
-           data.frame(row = idx_nz_true$row, col = idx_nz_true$col, value = . )) %>%
+  lapply(FUN = function(x) x[idx_nz_est$row, idx_nz_est$col] %>% diag %>%
+           data.frame(row = idx_nz_est$row, col = idx_nz_est$col, value = . )) %>%
   `names<-`(value = tau_seq) %>%
   bind_rows(.id = "tau") %>%
   unite(col = index, row, col, sep = ",") %>%
   mutate(index = paste0("(", index, ")"), tau = as.numeric(tau)) %>%
   ggplot() +
-  geom_line(aes(x = tau, y = value, group = index, color = index)) +
-  labs(x = expression(tau[l]), title = expression(gamma~"("~tau[l]~")"))
+  geom_line(aes(x = tau, y = value, group = index, color = index), size = 1.2) +
+  labs(x = expression(tau[l]), title = expression(gamma~"("~tau[l]~"), b = 21, "~Delta~"=[0.4,0.6]"))
 ```
 
 
@@ -457,6 +515,16 @@ norm(Y - Y_hat, "F")/norm(Y, "F")
 ```{r}
 cal_cl_sum(result$e, tau_seq)
 ```
+
+```{r}
+error <- list()
+for(l in 1:b) {
+  error[[l]] <- Y - X%*%lasso_coef
+}
+
+cal_cl_sum(error, tau_seq)
+```
+
 
 
 ```{r}
