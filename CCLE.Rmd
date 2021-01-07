@@ -14,6 +14,8 @@ library(data.table)
 library(pander)
 library(Rcpp)
 library(splines)
+library(fda)
+library(glmnet)
 
 source("https://raw.githubusercontent.com/S0Hye0NKim/add_decomp/master/functions/add_decomp_function.R")
 sourceCpp("functions/add_decomp_function.cpp")
@@ -98,27 +100,50 @@ gene_ex <- colnames(X)
 
 ```{r}
 K <- 10
-b <- 5
-
+b <- 21
 tau_seq <- seq(from = 0.4, to = 0.6, length.out = b)
-knots_seq <- seq(from = tau_seq[1] - 0.02, to = tau_seq[b] + 0.02, length.out = K - 2) %>% .[-c(1, (K - 2))]
-boundary <- c(tau_seq[1] - 0.02, tau_seq[b] + 0.02)
-Phi <- bs(tau_seq, knots = knots_seq, degree = 3, intercept = TRUE, Boundary.knots = boundary)
+
+knots_seq <- seq(min(tau_seq) - 0.02, max(tau_seq) + 0.02, length.out = K)
+Phi <- fda::bsplineS(tau_seq, breaks= knots_seq, norder=2, nderiv=0, returnMatrix=FALSE)
 
 V <- calc_V(as.matrix(X), Phi)
 ```
 
 
 ```{r}
+lasso_coef <- matrix(nrow = p+1, ncol = m)
+for(g in 1:m) {
+  cv.lasso <- cv.glmnet(x = X[, -1], y = as.matrix(Y)[, g], alpha = 1, type.measure = "mae")
+  lasso_model <- glmnet(X[, -1], as.matrix(Y)[, g], family = "gaussian", alpha = 1, lambda = cv.lasso$lambda.min)
+  lasso_coef[, g] <- c(lasso_model$a0, as.vector(lasso_model$beta))
+}
+
+
+theta_init <- matrix(nrow = (p+1)*K, ncol = m)
+for(g in 1:m) {
+  for(j in 0:p) {
+    theta_init[((j*K)+1):((j+1)*K), g] <- lasso_coef[j+1, g]
+  }
+}
+
+Y_modified <- (Y - X%*%lasso_coef) %>% as.matrix
+
+lin_model <- lm(Y_modified~., data = data.frame(X[, -1]))
+alpha_init <- lin_model$coefficients
+
+```
+
+
+```{r}
 max_iter <- 300
 delta <- 1
-lambda_1 <- 0.1
-lambda_2 <- 0.1
+lambda_1 <- 1.25
+lambda_2 <- 0.25
 tol_error <- 0.1
 
 start <- Sys.time()
 result <- add_decomp(delta, lambda_1, lambda_2, tol_error, max_iter, X = as.matrix(X), Y = as.matrix(Y), 
-                     V = V, Phi = Phi)
+                     V = V, Phi = Phi, theta_0 = theta_init, alpha_0 = alpha_init)
 end <- Sys.time()
 
 end - start
@@ -206,6 +231,27 @@ lapply(gamma_hat, FUN = function(x) data.frame(col = rep(1:m, each = (p+1)),
     axis.ticks.y = element_blank()) +
   ggtitle(expression("all of"~Gamma~"("~tau[l]~")"))
 ```
+
+```{r}
+idx_nz_est <- lapply(gamma_hat, FUN = function(x) which(abs(x) > 0.1^5, arr.ind = TRUE) %>% as_tibble) %>%
+    bind_rows (.id = "tau") %>%
+    group_by(row, col) %>%
+    summarise(zero = n()) 
+
+gamma_hat %>%
+  lapply(FUN = function(x) x[idx_nz_est$row, idx_nz_est$col] %>% diag %>%
+           data.frame(row = idx_nz_est$row, col = idx_nz_est$col, value = . )) %>%
+  `names<-`(value = tau_seq) %>%
+  bind_rows(.id = "tau") %>%
+  filter(row == 50) %>% 
+  unite(col = index, row, col, sep = ",") %>%
+  mutate(index = paste0("(", index, ")"), tau = as.numeric(tau)) %>%
+  ggplot() +
+  geom_line(aes(x = tau, y = value, group = index, color = index), size = 1.2) +
+  labs(x = expression(tau[l]), title = expression(gamma~"("~tau[l]~"), b = 21, "~Delta~"=[0.4,0.6]"))
+```
+
+
 
 # Check loss sum
 
@@ -358,8 +404,8 @@ cl_sum %>%
 # Two way
 
 ```{r}
-lamb_1_seq <- seq(from = 0.1, to = 1.6, by = 0.2)
-lamb_2_seq <- seq(from = 0.5, to = 2.5, by = 0.5)
+lamb_1_seq <- seq(from = 0.25, to = 2, by = 0.25)
+lamb_2_seq <- seq(from = 0.25, to = 2, by = 0.25)
 
 
 simul_2_way <- list()

@@ -18,6 +18,8 @@ library(gridExtra)
 library(foreach)
 library(doParallel)
 library(Rcpp)
+library(glmnet)
+library(fda)
 ```
 
 
@@ -111,7 +113,7 @@ attr(Phi, "knots")
 K <- 10
 tau_seq <- seq(from = 0.4, to = 0.6, length.out = b)
 
-knots_seq <- seq(0.39, 0.61, length.out = K)
+knots_seq <- seq(min(tau_seq) - 0.02, max(tau_seq) + 0.02, length.out = K)
 Phi <- fda::bsplineS(tau_seq, breaks= knots_seq, norder=2, nderiv=0, returnMatrix=FALSE)
 ```
 
@@ -480,9 +482,11 @@ idx_nz_est <- lapply(gamma_tau_hat, FUN = function(x) which(abs(x) > 0.1^5, arr.
     group_by(row, col) %>%
     summarise(zero = n()) 
 
+
+
 gamma_tau_hat %>%
-  lapply(FUN = function(x) x[idx_nz_est$row, idx_nz_est$col] %>% diag %>%
-           data.frame(row = idx_nz_est$row, col = idx_nz_est$col, value = . )) %>%
+  lapply(FUN = function(x) x[idx_nz_true$row, idx_nz_true$col] %>% diag %>%
+           data.frame(row = idx_nz_true$row, col = idx_nz_true$col, value = . )) %>%
   `names<-`(value = tau_seq) %>%
   bind_rows(.id = "tau") %>%
   unite(col = index, row, col, sep = ",") %>%
@@ -490,6 +494,26 @@ gamma_tau_hat %>%
   ggplot() +
   geom_line(aes(x = tau, y = value, group = index, color = index), size = 1.2) +
   labs(x = expression(tau[l]), title = expression(gamma~"("~tau[l]~"), b = 21, "~Delta~"=[0.4,0.6]"))
+```
+```{r}
+entry_sp_mat <- data.frame(row = rep(1:(p+1), m), col = rep(1:m, each = p+1), true = sp_mat %>% as.vector ) %>%
+  unite(col = index, row, col, sep = ",") %>%
+  mutate(index = paste0("(", index, ")"))
+
+gamma_tau_hat %>%
+  lapply(FUN = function(x) x[idx_nz_true$row, idx_nz_true$col] %>% diag %>%
+           data.frame(row = idx_nz_true$row, col = idx_nz_true$col, est = . )) %>%
+  `names<-`(value = tau_seq) %>%
+  bind_rows(.id = "tau") %>%
+  unite(col = index, row, col, sep = ",") %>%
+  mutate(index = paste0("(", index, ")"), tau = as.numeric(tau)) %>%
+  left_join(entry_sp_mat, by = "index") %>%
+  gather(key = "type", value = "value", -tau, -index) %>%
+  mutate(group_var = paste0(index, "_", type)) %>%
+  ggplot() +
+  geom_line(aes(x = tau, y = value, group = group_var, color = index, linetype = type), size = 1.2) +
+  labs(x = expression(tau[l]), title = expression(gamma~"("~tau[l]~"), b = 21, "~Delta~"=[0.4,0.6]")) +
+  facet_wrap(~index)
 ```
 
 
@@ -589,6 +613,22 @@ for(idx in 1:length(lamb_2_seq)) {
 }
 
 ```
+
+
+```{r}
+cores <- detectCores()
+cl <- makeCluster(cores[1] - 2)
+registerDoParallel(cl)
+
+simul <- foreach(lamb_2_seq = c(1, 2)) %dopar% {
+  library(tidyverse)
+  add_decomp_r(delta, lambda_1, lamb_2_seq, tol_error, max_iter, theta_init, alpha_init)
+}
+
+stopCluster(cl)
+```
+
+
 
 
 ```{r eval = FALSE}
