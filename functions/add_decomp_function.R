@@ -76,7 +76,7 @@ add_decomp <- function(delta, lambda_1, lambda_2, tol_error, max_iter, X, Y, V, 
 }
 
 # Calculate TP, TN, FP, FN of sparse matrix
-check_sp_table <- function(true, est, tol = 0.1^5, table = FALSE, nnz = num_nz, nz = num_zero) {
+check_sp_table <- function(true, est, tol = 0.1^5, table = FALSE) {
   # check sparsity pattern of true and est matrix
   zero_idx_true <- which(abs(true) < tol, arr.ind = TRUE) %>% as_tibble
   zero_idx_est <- lapply(est, FUN = function(x) which(abs(x) < tol, arr.ind = TRUE) %>% as_tibble) %>%
@@ -85,23 +85,21 @@ check_sp_table <- function(true, est, tol = 0.1^5, table = FALSE, nnz = num_nz, 
     summarise(zero = n()) %>%
     filter(zero == b)
   
-  p <- nrow(true) - 1
-  m <- ncol(true)
   num_zero <- which(true==0, arr.ind = TRUE) %>% nrow
-  num_nz <- (p+1)*m - num_zero
+  num_nz <- length(true) - num_zero
   
   if(nrow(zero_idx_est) == 0) {
-    result <- data.frame(Positive = c(nnz, nz), Negative = c(0, 0))
+    result <- data.frame(Positive = c(num_nz, num_zero), Negative = c(0, 0))
   } else {
     TN <- semi_join(zero_idx_true, zero_idx_est, by = c("row", "col"))
     FP <- anti_join(zero_idx_true, zero_idx_est, by = c("row", "col"))
     FN <- anti_join(zero_idx_est, zero_idx_true, by = c("row", "col"))
-    result <- data.frame(Positive = c(nnz - nrow(FN), nrow(FP)), Negative = c(nrow(FN), nrow(TN))) %>%
+    result <- data.frame(Positive = c(num_nz - nrow(FN), nrow(FP)), Negative = c(nrow(FN), nrow(TN))) %>%
       `rownames<-`(value = c("Positive", "Negative")) %>%
       `colnames<-`(value = c("Est_Positive", "Est_Negative"))
   }
   
-  if(table == FALSE) {return(data.frame(FPR = result[2, 1]/nz, TPR = result[1, 1]/nnz))
+  if(table == FALSE) {return(data.frame(FPR = result[2, 1]/nz, TPR = result[1, 1]/num_nz))
   } else {return(result)}
 }
 
