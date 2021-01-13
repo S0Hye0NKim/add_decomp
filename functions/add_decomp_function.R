@@ -99,7 +99,7 @@ check_sp_table <- function(true, est, tol = 0.1^5, table = FALSE) {
       `colnames<-`(value = c("Est_Positive", "Est_Negative"))
   }
   
-  if(table == FALSE) {return(data.frame(FPR = result[2, 1]/nz, TPR = result[1, 1]/num_nz))
+  if(table == FALSE) {return(data.frame(FPR = result[2, 1]/num_zero, TPR = result[1, 1]/num_nz))
   } else {return(result)}
 }
 
