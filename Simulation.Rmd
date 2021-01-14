@@ -345,6 +345,195 @@ c(mean(SISE), sd(SISE))
 $$\epsilon_i^{(g)}(\tau)\sim\Phi(\tilde{x}_{i3})t_3$$
 
 
+## 0. Initial Setting
+
+```{r}
+set.seed(0)
+n <- 400
+m <- 10
+p <- 30
+b <- 21
+num_rank <- 5
+simul_times <- 100
+
+sigma_mat <- matrix(nrow = p, ncol = p)
+for(j in 1:p) {
+  for(k in 1:p) {
+    sigma_mat[j, k] <- 0.3^(abs(j-k))
+  }
+}
+
+X_list <- list()
+LR_mat_list <- list()
+sp_mat_list <- list()
+eps_list <- list()
+
+for(simul in 1:simul_times) {
+  X <- matrix(rnorm(n*p, mean = 0, sd = 1), nrow = n)
+  X_list[[simul]] <- X %*% expm::sqrtm(sigma_mat) %>%
+    cbind(rep(1, n), .)
+  
+  col_ind <- sample(1:m, size = m, replace = FALSE)
+  row_ind <- sample(1:(p+1), size = m)
+  sp_mat_list[[simul]] <- matrix(0, nrow = p+1, ncol = m)
+  for(i in 1:m) {
+    sp_mat_list[[simul]][row_ind[i], col_ind[i]] <- rnorm(1, mean = 5, sd = 0.1)
+  }
+  
+  LR_mat <- matrix(rnorm((p+1)*m, mean = 1, sd = 0.1), ncol = m) # make low rank matrix using SVD
+  SVD <- svd(LR_mat)
+  D_mat <- diag(SVD$d)
+  idx <- (num_rank+1):m
+  D_mat[idx, idx] <- 0
+  LR_mat_list[[simul]] <- SVD$u %*% D_mat %*% t(SVD$v)
+  
+  eps_list[[simul]] <- matrix(nrow = n, ncol = m)
+  for(i in 1:n) {
+    for(j in 1:m) {
+      x_i3 <- X_list[[simul]][i, 3]
+      t_3 <- rt(1, df = 3)
+      eps_list[[simul]][i, j] <- pnorm(x_i3)*t_3
+    }
+  }
+}
+
+Y_list <- mapply(FUN = function(X, LR, SP, eps) X %*% (LR + SP) + eps, 
+                 X_list, LR_mat_list, sp_mat_list, eps_list, SIMPLIFY = FALSE)
+```
+
+
+## 1. Basis Function.
+
+```{r}
+K <- 10
+tau_seq <- seq(from = 0.4, to = 0.6, length.out = b)
+
+knots_seq <- seq(min(tau_seq) - 0.02, max(tau_seq) + 0.02, length.out = K)
+Phi <- fda::bsplineS(tau_seq, breaks= knots_seq, norder=2, nderiv=0, returnMatrix=FALSE)
+
+V_list <- list()
+for(simul in 1:simul_times) {
+  V_list[[simul]] <- calc_V(X_list[[simul]], Phi)
+}
+```
+
+
+## 3. Simulation
+
+```{r}
+cores=detectCores()
+cl <- makeCluster(cores[1]-2) #not to overload your computer
+registerDoParallel(cl) # Ready to parallel
+
+simulation <- foreach(simul = 1:simul_times) %dopar% {
+  library(tidyverse)
+  library(splines)
+  library(Matrix)
+  library(Rcpp)
+  library(glmnet)
+  library(fda)
+  
+  tau_seq <- seq(from = 0.4, to = 0.6, length.out = b)
+  lasso_coef <- matrix(nrow = p+1, ncol = m)
+  for(g in 1:m) {
+    cv.lasso <- cv.glmnet(x = X_list[[simul]][, -1], y = Y_list[[simul]][, g], 
+                          alpha = 1, type.measure = "mae")
+    lasso_model <- glmnet(X_list[[simul]][, -1], Y_list[[simul]][, g], 
+                          family = "gaussian", alpha = 1, lambda = cv.lasso$lambda.min)
+    lasso_coef[, g] <- c(lasso_model$a0, as.vector(lasso_model$beta))
+  }
+  
+  theta_init <- matrix(nrow = (p+1)*K, ncol = m)
+  for(g in 1:m) {
+    for(j in 0:p) {
+      theta_init[((j*K)+1):((j+1)*K), g] <- lasso_coef[j+1, g]
+    }
+  }
+  
+  Y_modified <- Y_list[[simul]] - X_list[[simul]]%*%lasso_coef
+  lin_model <- lm(Y_modified~., data = data.frame(X_list[[simul]][, -1]))
+  alpha_init <- lin_model$coefficients
+  
+  result <- add_decomp_r(delta = 1, lambda_1 = 6, lambda_2 = 30, tol_error = 0.1,max_iter = 300,
+                       X = X_list[[simul]], Y = Y_list[[simul]], V = V_list[[simul]], Phi = Phi, 
+                     theta_0 = theta_init, alpha_0 = alpha_init)
+  result
+  
+}
+
+
+
+stopCluster(cl)
+```
+
+
+## 4. Evaluation.
+
+
+### 4-1. Low rank matrix
+
+```{r}
+alpha_list <- lapply(simulation, FUN = function(x) x$alpha)
+
+sapply(alpha_list, rankMatrix) %>% mean
+```
+
+```{r}
+lapply(alpha_list, FUN= function(x) svd(x) %>% .$d) %>%
+  sapply(FUN = function(x) sum(x[1:5])/sum(x)) %>% mean
+```
+
+### 4-2. Sparse matrix
+
+```{r}
+theta_list <- lapply(simulation, FUN = function(x) x$theta)
+
+gamma_list <- lapply(theta_list, FUN = function(x) est_gamma(Phi, theta = x))
+```
+
+
+```{r message=FALSE}
+
+sp_table <- list()
+for(simul in 1:simul_times) {
+  sp_table[[simul]] <- check_sp_table(true = sp_mat_list[[simul]], est = gamma_list[[simul]], 
+                                      table = FALSE)
+}
+
+
+sp_table %>%
+  bind_rows() %>%
+  mutate(TP = TPR, TN = 1-FPR) %>%
+  dplyr::select(TP, TN) %>%
+  summarise(TP_mean = mean(TP), TP_sd = sd(TP), TN_mean = mean(TN), TN_sd = sd(TN))
+
+```
+
+
+### 4-3. SISE
+
+
+$$\text{SISE} = \sum_{i=1}^n\sum_{g=1}^m\int_\Delta\big(\hat{Y}_i^{(g)}(\tau)-Y_i^{(g)}(\tau)\big)^2d\tau/m$$
+
+
+```{r}
+alpha <- simulation[[1]]$alpha
+theta <- simulation[[1]]$theta
+gamma_tau <- est_gamma(Phi, theta)
+Y <- Y_list[[1]]
+X <- X_list[[1]]
+h <- tau_seq[2] - tau_seq[1]
+
+
+Y_hat <- lapply(gamma_tau, FUN = function(x) X %*% (x + alpha))
+
+SISE <- (sapply(Y_hat, FUN = function(x) as.vector(x - Y)^2 %>% sum) * h/m)
+
+c(mean(SISE), sd(SISE))
+
+```
+
+
 ---
 
 # Case 3. 
