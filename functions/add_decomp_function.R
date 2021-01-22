@@ -216,7 +216,7 @@ check_sp_table <- function(true, est, tol = 0.1^5, table = FALSE) {
 
 # Estimate gamma from theta
 est_gamma <- function(Phi, theta) {
-  l <- nrow(Phi)
+  b <- nrow(Phi)
   K <- ncol(Phi)
   m <- ncol(theta)
   p <- nrow(theta)/K - 1
