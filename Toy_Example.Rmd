@@ -377,7 +377,7 @@ $$\begin{aligned}EE &= \sqrt{\int_\Delta\sum_{j=1}^p\sum_{g=1}^m\bigg(\hat{\Gamm
 ```{r}
 h <- tau_seq_real[2] - tau_seq_real[1]
 
-EE_mat <-  lapply(gamma_tau_hat[-1], FUN = function(x) as.vector(x - sp_mat)*(x - sp_mat) * h) %>%
+EE_mat <-  lapply(gamma_tau_hat[-1], FUN = function(x) (x - sp_mat)*(x - sp_mat) * h) %>%
   Reduce("+", .) 
 
 EE_mat %>% apply(2, mean) %>% sum %>% sqrt
