@@ -186,8 +186,9 @@ add_decomp_r <- function(delta, lambda_1, lambda_2, tol_error, max_iter, X, Y, V
 }
 
 # Calculate TP, TN, FP, FN of sparse matrix
-check_sp_table <- function(true, est, tol = 0.1^5, table = FALSE) {
+check_sp_table <- function(true, est, tol = 0.1^5, table = FALSE, tau_seq) {
   # check sparsity pattern of true and est matrix
+  b <- length(tau_seq)
   zero_idx_true <- which(abs(true) < tol, arr.ind = TRUE) %>% as_tibble
   zero_idx_est <- lapply(est, FUN = function(x) which(abs(x) < tol, arr.ind = TRUE) %>% as_tibble) %>%
     bind_rows (.id = "tau") %>%
