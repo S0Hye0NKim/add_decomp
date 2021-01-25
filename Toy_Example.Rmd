@@ -179,7 +179,7 @@ tol_error <- 0.1
 
 
 result <- add_decomp(delta, lambda_1, lambda_2, tol_error, max_iter, X = X, Y = Y, V = V, Phi = Phi, 
-                     theta_0 = theta_init, alpha_0 = alpha_init)
+                     theta_0 = theta_init, alpha_0 = alpha_init, tau_seq = tau_seq)
 ```
 
 
@@ -188,6 +188,7 @@ $\lambda_1, \lambda_2, \delta$ 어떻게?
 
 ```{r}
 result$iter_error %>% 
+  `colnames<-`(value = c("eta", "theta", "alpha", "e", "u", "w")) %>% 
   na.omit() %>%
   data.frame %>%
   mutate(iter = 1:nrow(.)) %>%
