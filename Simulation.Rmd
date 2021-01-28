@@ -403,7 +403,7 @@ set.seed(0)
 n <- 400
 m <- 10
 p <- 30
-b <- 21
+b <- 31
 num_rank <- 5
 
 X <- matrix(rnorm(n*p, mean = 0, sd = 1), nrow = n) %>% cbind(1, .)   #add intercept term in X
@@ -431,11 +431,13 @@ eps <- matrix(rnorm(n*m, mean = 0, sd = 0.1), nrow = n)
 Y <- X%*%true_B + eps
 ```
 
+
 ```{r}
 K <- 10
-tau_seq <- seq(from = 0.4, to = 0.6, length.out = b)
+tau_seq <- seq(from = 0.35, to = 0.65, length.out = b)
+tau_seq_real <- tau_seq[tau_seq > 0.39 & tau_seq < 0.61]
 
-knots_seq <- seq(min(tau_seq) - 0.02, max(tau_seq) + 0.02, length.out = K)
+knots_seq <- seq(min(tau_seq)- 0.02, max(tau_seq) + 0.02, length.out = K)
 Phi <- fda::bsplineS(tau_seq, breaks= knots_seq, norder=2, nderiv=0, returnMatrix=FALSE)
 
 V <- calc_V(X, Phi)
@@ -449,15 +451,16 @@ cl <- makeCluster(cores[1]-2) #not to overload your computer
 registerDoParallel(cl) # Ready to parallel
 lamb1_seq <- c(1:10, 15, 20, 30, 35)
 
-simulation <- foreach(lambda_1 = lamb1_seq) %dopar% {
+simulation <- foreach(lambda_1 = lamb1_seq, .noexport = "add_decomp") %dopar% {
   library(tidyverse)
   library(splines)
   library(Matrix)
   library(Rcpp)
   library(glmnet)
   library(fda)
+  sourceCpp("functions/add_decomp_function.cpp")
   
-  tau_seq <- seq(from = 0.4, to = 0.6, length.out = b)
+  tau_seq <- seq(from = 0.35, to = 0.65, length.out = b)
   lasso_coef <- matrix(nrow = p+1, ncol = m)
   for(g in 1:m) {
     cv.lasso <- cv.glmnet(x = X[, -1], y = Y[, g], 
@@ -490,6 +493,36 @@ stopCluster(cl)
 ```
 
 
+```{r}
+for(i in 1:(cores[1]-2)) {
+  tau_seq <- seq(from = 0.35, to = 0.65, length.out = b)
+  lasso_coef <- matrix(nrow = p+1, ncol = m)
+  
+  for(g in 1:m) {
+    cv.lasso <- cv.glmnet(x = X[, -1], y = Y[, g], 
+                          alpha = 1, type.measure = "mae")
+    lasso_model <- glmnet(X[, -1], Y[, g], 
+                          family = "gaussian", alpha = 1, lambda = cv.lasso$lambda.min)
+    lasso_coef[, g] <- c(lasso_model$a0, as.vector(lasso_model$beta))
+  }
+  
+  theta_init <- matrix(nrow = (p+1)*K, ncol = m)
+  for(g in 1:m) {
+    for(j in 0:p) {
+      theta_init[((j*K)+1):((j+1)*K), g] <- lasso_coef[j+1, g]
+    }
+  }
+  
+  Y_modified <- Y - X%*%lasso_coef
+  lin_model <- lm(Y_modified~., data = data.frame(X[, -1]))
+  alpha_init <- lin_model$coefficients
+  result <- add_decomp(delta = 1, lambda_1 = lamb1_seq[i], lambda_2 = 20, tol_error = 0.1, max_iter = 300,
+                       X = X, Y = Y, V = V, Phi = Phi, 
+                     theta_0 = theta_init, alpha_0 = alpha_init, tau_seq = tau_seq)
+  simulation[[i]] <- result
+}
+```
+
 
 ```{r}
 rank <- simulation %>% sapply(FUN = function(x) x$alpha %>% rankMatrix %>% .[1])
@@ -498,8 +531,12 @@ data.frame(lambda_1 = lamb1_seq, rank = rank) %>%
   ggplot() +
   geom_line(aes(x = lambda_1, y = rank)) +
   labs(title = "Solution path for low rank matrix", 
-       x = expression(lambda[1]))
+       x = expression(lambda[1])) +
+  expand_limits(y = c(0, 10))
 ```
+
+
+
 
 ## 3. Sparse matrix
 
@@ -507,17 +544,18 @@ data.frame(lambda_1 = lamb1_seq, rank = rank) %>%
 cores=detectCores()
 cl <- makeCluster(cores[1]-2) #not to overload your computer
 registerDoParallel(cl) # Ready to parallel
-lamb2_seq <- c(seq(5, 60, by = 5), 70, 80, 90, 100)
+lamb2_seq <- c(seq(5, 60, by = 5), seq(70, 200, by = 20))
 
-simulation <- foreach(lambda_2 = lamb2_seq) %dopar% {
+simulation <- foreach(lambda_2 = lamb2_seq, .noexport = "add_decomp") %dopar% {
   library(tidyverse)
   library(splines)
   library(Matrix)
   library(Rcpp)
   library(glmnet)
   library(fda)
+  sourceCpp("functions/add_decomp_function.cpp")
   
-  tau_seq <- seq(from = 0.4, to = 0.6, length.out = b)
+  tau_seq <- seq(from = 0.35, to = 0.65, length.out = b)
   lasso_coef <- matrix(nrow = p+1, ncol = m)
   for(g in 1:m) {
     cv.lasso <- cv.glmnet(x = X[, -1], y = Y[, g], 
@@ -538,9 +576,9 @@ simulation <- foreach(lambda_2 = lamb2_seq) %dopar% {
   lin_model <- lm(Y_modified~., data = data.frame(X[, -1]))
   alpha_init <- lin_model$coefficients
   
-  result <- add_decomp_r(delta = 1, lambda_1 = 4, lambda_2 = lambda_2, tol_error = 0.1,max_iter = 300,
+  result <- add_decomp(delta = 1, lambda_1 = 4, lambda_2 = lambda_2, tol_error = 0.1,max_iter = 300,
                        X = X, Y = Y, V = V, Phi = Phi, 
-                     theta_0 = theta_init, alpha_0 = alpha_init)
+                     theta_0 = theta_init, alpha_0 = alpha_init, tau_seq = tau_seq)
   result
 }
 
@@ -549,6 +587,37 @@ simulation <- foreach(lambda_2 = lamb2_seq) %dopar% {
 stopCluster(cl)
 ```
 
+```{r}
+for(i in 1:(cores[1]-2)) {
+  tau_seq <- seq(from = 0.35, to = 0.65, length.out = b)
+  lasso_coef <- matrix(nrow = p+1, ncol = m)
+  
+  for(g in 1:m) {
+    cv.lasso <- cv.glmnet(x = X[, -1], y = Y[, g], 
+                          alpha = 1, type.measure = "mae")
+    lasso_model <- glmnet(X[, -1], Y[, g], 
+                          family = "gaussian", alpha = 1, lambda = cv.lasso$lambda.min)
+    lasso_coef[, g] <- c(lasso_model$a0, as.vector(lasso_model$beta))
+  }
+  
+  theta_init <- matrix(nrow = (p+1)*K, ncol = m)
+  for(g in 1:m) {
+    for(j in 0:p) {
+      theta_init[((j*K)+1):((j+1)*K), g] <- lasso_coef[j+1, g]
+    }
+  }
+  
+  Y_modified <- Y - X%*%lasso_coef
+  lin_model <- lm(Y_modified~., data = data.frame(X[, -1]))
+  alpha_init <- lin_model$coefficients
+  result <- add_decomp(delta = 1, lambda_1 = 4, lambda_2 = lamb2_seq[i], tol_error = 0.1, max_iter = 300,
+                       X = X, Y = Y, V = V, Phi = Phi, 
+                     theta_0 = theta_init, alpha_0 = alpha_init, tau_seq = tau_seq)
+  simulation[[i]] <- result
+}
+```
+
+
 
 $$\int_\Delta\{\hat{\Gamma}(\tau)\}_{jg}d\tau=\sum_{\ell=1}^b\{\hat{\Gamma}(\tau)\}_{jg}\frac{\Delta}{(b-1)}$$
 
@@ -556,9 +625,13 @@ $$\int_\Delta\{\hat{\Gamma}(\tau)\}_{jg}d\tau=\sum_{\ell=1}^b\{\hat{\Gamma}(\tau
 h <- tau_seq[2] - tau_seq[1]
 alpha_list <- lapply(simulation, FUN = function(x) x$alpha)
 theta_list <- lapply(simulation, FUN = function(x) x$theta)
-gamma_list <- lapply(theta_list, FUN = function(x) est_gamma(Phi, theta = x))
 
-sum_gamma_list <- lapply(gamma_list, FUN = function(x) x[-1] %>% Reduce("+", .))
+idx_tau <- (tau_seq > 0.39 & tau_seq <= 0.61)
+gamma_list <- lapply(theta_list, FUN = function(x) est_gamma(Phi[idx_tau, ], theta = x))
+
+gamma_square <- gamma_list %>% lapply(FUN = function(x) lapply(x[-1], FUN = function(x) x * x))
+sum_gamma_list <- lapply(gamma_square, FUN = function(x) x %>% Reduce("+", .))  #summation per lambda 2
+
 int_gamma <- sum_gamma_list %>% lapply(FUN = function(x) x*h)
 
 int_gamma_tidy <- lapply(int_gamma, FUN = function(x) data.frame(col = rep(1:m, each = (p+1)), 
@@ -566,7 +639,7 @@ int_gamma_tidy <- lapply(int_gamma, FUN = function(x) data.frame(col = rep(1:m, 
                                                           value = as.vector(x))) %>%
   `names<-`(value = lamb2_seq) %>%
   bind_rows(.id = "lambda_2") %>% tbl_df %>%
-  mutate(lambda_2 = as.numeric(lambda_2), row = as.character(row))
+  mutate(lambda_2 = as.numeric(lambda_2), row = as.character(row), value = sqrt(value))
 
 int_gamma_tidy %>%
   mutate(index = paste0("(", col, ",", row, ")")) %>%
