@@ -46,6 +46,7 @@ List add_decomp(double delta, double lambda_1, double lambda_2, double tol_error
   
   //iteration
   for(int iter=0; iter<max_iter; iter++) {
+    
     //Process for eta
     List Vu_prod(b);
     List Ve_prod(b);
@@ -69,16 +70,21 @@ List add_decomp(double delta, double lambda_1, double lambda_2, double tol_error
     arma::mat theta_new((p+1)*K, m);
     for(int g = 0; g<m; g++) {
       arma::vec r_j = eta_new.col(g) - (w_old.col(g)/delta);
+      arma::vec theta_tilde_j = theta_0.col(g);
       for(int j=0; j<(p+1); j++) {
-        arma::vec sub_vec = r_j.subvec(K*j, K*(j+1)-1);
-        double accum = 0;
+        arma::vec r_j_g = r_j.subvec(K*j, K*(j+1)-1);
+        arma::vec theta_tilde_j_g = theta_tilde_j.subvec(K*j, K*(j+1)-1);
+        double accum_r_j_g = 0;
+        double accum_theta_tilde_j_g = 0;
         for(int i=0; i<K; i++) {
-          accum += sub_vec[i]*sub_vec[i];
+          accum_r_j_g += r_j_g[i]*r_j_g[i];
+          accum_theta_tilde_j_g += theta_tilde_j_g[i]*theta_tilde_j_g[i];
         }
-        double norm = sqrt(accum);
-        double value = 1 - (lambda_2/(delta*norm));
+        double norm_r_j_g = sqrt(accum_r_j_g);
+        double norm_theta_tilde_j_g = sqrt(accum_theta_tilde_j_g);
+        double value = 1 - (lambda_2/(delta*norm_r_j_g*norm_theta_tilde_j_g));
         if(value >= 0) {
-          theta_new.submat(K*j, g, K*(j+1)-1, g) = value * sub_vec;
+          theta_new.submat(K*j, g, K*(j+1)-1, g) = value * r_j_g;
         } else {
           theta_new.submat(K*j, g, K*(j+1)-1, g) = arma::vec(K);
         }
@@ -95,7 +101,12 @@ List add_decomp(double delta, double lambda_1, double lambda_2, double tol_error
     arma::svd(P, d, Q, obj);
     if(m > n) {Q = Q.cols(0, n-1);}
     if(n > m) {P = P.cols(0, m-1);}
-    arma::vec d_new = d - lambda_1/(delta*b);
+    // adaptive weight
+    arma::mat alpha_0_P;
+    arma::mat alpha_0_Q;
+    arma::vec alpha_0_d;
+    arma::svd(alpha_0_P, alpha_0_d, alpha_0_Q, alpha_0);
+    arma::vec d_new = d - lambda_1/(delta*b*alpha_0_d);
     NumericVector diag_entry = ifelse(as<NumericVector>(wrap(d_new)) > 0, 
                                       as<NumericVector>(wrap(d_new)), 0);
     arma::mat D_new = diagmat(as<arma::vec>(wrap(diag_entry)));
