@@ -120,7 +120,7 @@ check_sp_table <- function(true, est, tol = 0.1^5, table = FALSE, tau_seq) {
   zero_idx_est <- lapply(est, FUN = function(x) which(abs(x) < tol, arr.ind = TRUE) %>% as_tibble) %>%
     bind_rows (.id = "tau") %>%
     group_by(row, col) %>%
-    summarise(zero = n()) %>%
+    summarise(zero = n(), .groups = "keep") %>%
     filter(zero == b)
   
   num_zero <- which(true==0, arr.ind = TRUE) %>% nrow
