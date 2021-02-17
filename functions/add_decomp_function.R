@@ -183,7 +183,7 @@ cal_cl_sum <- function(e, tau_seq) {
 
 
 # parameter selection via BIC
-BIC_func <- function(X, Y, V, Phi, model, tau_seq, tau_seq_real, lamb1_seq, lamb2_seq) {
+BIC_func <- function(X, Y, V, Phi, model, tau_seq, tau_seq_real, lamb1_seq, lamb2_seq, table = TRUE) {
   m <- ncol(Y)
   p <- ncol(X) - 1
   K <- ncol(V[[1]])/(p+1)
@@ -230,5 +230,7 @@ BIC_func <- function(X, Y, V, Phi, model, tau_seq, tau_seq_real, lamb1_seq, lamb
                       BIC_log_n == BIC_val_min["log_n"] | BIC_llog_p == BIC_val_min["llog_p"] | 
                       BIC_llog_n == BIC_val_min["llog_n"])
   
-  return(min_BIC)
+  if(table == TRUE) {
+    return(BIC_data)
+  } else {return(min_BIC)}
 }
