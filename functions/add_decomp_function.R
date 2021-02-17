@@ -180,3 +180,55 @@ cal_cl_sum <- function(e, tau_seq) {
     unlist %>% sum
   return(result/n)
 }
+
+
+# parameter selection via BIC
+BIC_func <- function(X, Y, V, Phi, model, tau_seq, tau_seq_real, lamb1_seq, lamb2_seq) {
+  m <- ncol(Y)
+  p <- ncol(X) - 1
+  K <- ncol(V[[1]])/(p+1)
+  idx_tau <- tau_seq %in% tau_seq_real
+  
+  BIC <- list()
+  for(i in 1:length(lamb1_seq)) {
+    BIC[[i]] <- list()
+    for(j in 1:length(lamb2_seq)) {
+      result <- model[[i]][[j]]
+      est_error <- lapply(V[idx_tau], FUN = function(x) (Y - X %*% result$alpha - x %*% result$theta)
+                          %>% as.vector())
+      check_loss_err <- mapply(FUN = function(x, tau) check_ft(x, tau), x = est_error, 
+                               tau = as.list(tau_seq_real), SIMPLIFY = FALSE) %>%
+        lapply(FUN = function(x) sum(x)/n) %>% unlist %>% sum
+      gamma_tau_hat <- est_gamma(Phi[idx_tau, ], result$theta)
+      S_hat <- check_sp_table(true = matrix(0, nrow = (p+1), ncol = m), 
+                              est = gamma_tau_hat, table = TRUE, tol = 0.1^5, tau_seq = tau_seq_real) %>%
+        .$Est_Positive %>% sum
+      BIC[[i]][[j]] <- data.frame(log_Q = log(check_loss_err), 
+                                  r_hat = rankMatrix(result$alpha)[1], 
+                                  S_hat = S_hat)
+    }
+  }
+  
+  BIC_data <- lapply(BIC, FUN = function(x) `names<-`(x, value = lamb2_seq) %>% 
+                       bind_rows(.id = "lambda_2")) %>%
+    `names<-`(value = lamb1_seq) %>%
+    bind_rows(.id = "lambda_1") %>%
+    mutate(term = (r_hat * (m + p - r_hat) + K * S_hat)/(2*n), 
+           BIC_log_sum = log_Q + log(p+m)*term, 
+           BIC_log_p = log_Q + log(p)*term, 
+           BIC_log_n = log_Q + log(n)*term, 
+           BIC_llog_p = log_Q + log(log(p))*term,
+           BIC_llog_n = log_Q + log(log(n))*term) %>%
+    group_by(lambda_1, lambda_2) %>%
+    select_at(vars(starts_with("BIC"))) %>%
+    ungroup()
+  
+  BIC_val_min <- apply(select_at(BIC_data, vars(starts_with("BIC"))), 2, min) %>%
+    `names<-`(value = c("log_sum", "log_p", "log_n", "llog_p", "llog_n"))
+  
+  min_BIC <- filter(BIC_data, BIC_log_sum == BIC_val_min["log_sum"]| BIC_log_p == BIC_val_min["log_p"] |
+                      BIC_log_n == BIC_val_min["log_n"] | BIC_llog_p == BIC_val_min["llog_p"] | 
+                      BIC_llog_n == BIC_val_min["llog_n"])
+  
+  return(min_BIC)
+}
