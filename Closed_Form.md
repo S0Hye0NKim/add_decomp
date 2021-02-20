@@ -100,6 +100,12 @@ u=0\\quad\\text{where
 "\\therefore\\hat{\\theta}^{(g)}_j=(1-\\frac{\\lambda_2\\cdot \\phi_j^{(g)}/\\delta}{||r_j^{(g)}||_2})_+r_j^{(g)}\\quad\\text{where }r_j^{(g)}=\\eta_j^{(g)}-w_j^{(g)}/\\delta")  
 
   
+![\\begin{aligned}&\\rightarrow\\text{if
+}\\;(1-\\frac{\\lambda\_2\\cdot\\phi\_j^{(g)}/\\delta}{||r\_j^{(g)}||\_2})\>0,\\quad\\hat{\\theta}\_j^{(g)}\\ne0\\\\&\\rightarrow\\text{if
+}\\;\\lambda\_2\<\\delta\\cdot||r\_j^{(g)}||\_2\\cdot||\\tilde{\\theta}\_j^{(g)}||\_2,\\quad\\hat{\\theta}\_j^{(g)}\\ne0\\end{aligned}](https://latex.codecogs.com/png.latex?%5Cbegin%7Baligned%7D%26%5Crightarrow%5Ctext%7Bif%20%7D%5C%3B%281-%5Cfrac%7B%5Clambda_2%5Ccdot%5Cphi_j%5E%7B%28g%29%7D%2F%5Cdelta%7D%7B%7C%7Cr_j%5E%7B%28g%29%7D%7C%7C_2%7D%29%3E0%2C%5Cquad%5Chat%7B%5Ctheta%7D_j%5E%7B%28g%29%7D%5Cne0%5C%5C%26%5Crightarrow%5Ctext%7Bif%20%7D%5C%3B%5Clambda_2%3C%5Cdelta%5Ccdot%7C%7Cr_j%5E%7B%28g%29%7D%7C%7C_2%5Ccdot%7C%7C%5Ctilde%7B%5Ctheta%7D_j%5E%7B%28g%29%7D%7C%7C_2%2C%5Cquad%5Chat%7B%5Ctheta%7D_j%5E%7B%28g%29%7D%5Cne0%5Cend%7Baligned%7D
+"\\begin{aligned}&\\rightarrow\\text{if }\\;(1-\\frac{\\lambda_2\\cdot\\phi_j^{(g)}/\\delta}{||r_j^{(g)}||_2})\>0,\\quad\\hat{\\theta}_j^{(g)}\\ne0\\\\&\\rightarrow\\text{if }\\;\\lambda_2\<\\delta\\cdot||r_j^{(g)}||_2\\cdot||\\tilde{\\theta}_j^{(g)}||_2,\\quad\\hat{\\theta}_j^{(g)}\\ne0\\end{aligned}")  
+
+  
 ![\\begin{aligned}\\frac{\\partial^2 Q}{\\partial
 \\theta\_j^{2(g)T}}&=\\underbrace{\\delta+\\begin{cases}1/||\\theta\_j||\_2&\\quad\\text{if
 } \\theta\_j \\ne 0\\\\0&\\quad\\text{if }
@@ -162,6 +168,14 @@ b)}\\}\_+)\\end{aligned}](https://latex.codecogs.com/png.latex?%5Cbegin%7Baligne
 where
 ![\\boldsymbol{\\psi}\_i=\\frac{1}{\\tilde{\\sigma}\_i}](https://latex.codecogs.com/png.latex?%5Cboldsymbol%7B%5Cpsi%7D_i%3D%5Cfrac%7B1%7D%7B%5Ctilde%7B%5Csigma%7D_i%7D
 "\\boldsymbol{\\psi}_i=\\frac{1}{\\tilde{\\sigma}_i}")
+
+  
+![\\begin{aligned}&\\rightarrow\\text{if
+}\\;\\sigma\_i-\\frac{\\lambda\_1\\boldsymbol{\\psi}\_i}{(\\delta\\cdot
+b)}\>0,\\quad\\textbf{Z}\\ne0\\\\&\\rightarrow\\text{if
+}\\;\\lambda\_1\<\\delta\\cdot
+b\\cdot\\sigma\_i\\cdot\\tilde{\\sigma}\_i,\\quad\\textbf{Z}\\ne0\\end{aligned}](https://latex.codecogs.com/png.latex?%5Cbegin%7Baligned%7D%26%5Crightarrow%5Ctext%7Bif%20%7D%5C%3B%5Csigma_i-%5Cfrac%7B%5Clambda_1%5Cboldsymbol%7B%5Cpsi%7D_i%7D%7B%28%5Cdelta%5Ccdot%20b%29%7D%3E0%2C%5Cquad%5Ctextbf%7BZ%7D%5Cne0%5C%5C%26%5Crightarrow%5Ctext%7Bif%20%7D%5C%3B%5Clambda_1%3C%5Cdelta%5Ccdot%20b%5Ccdot%5Csigma_i%5Ccdot%5Ctilde%7B%5Csigma%7D_i%2C%5Cquad%5Ctextbf%7BZ%7D%5Cne0%5Cend%7Baligned%7D
+"\\begin{aligned}&\\rightarrow\\text{if }\\;\\sigma_i-\\frac{\\lambda_1\\boldsymbol{\\psi}_i}{(\\delta\\cdot b)}\>0,\\quad\\textbf{Z}\\ne0\\\\&\\rightarrow\\text{if }\\;\\lambda_1\<\\delta\\cdot b\\cdot\\sigma_i\\cdot\\tilde{\\sigma}_i,\\quad\\textbf{Z}\\ne0\\end{aligned}")  
 
 ## 4\. Closed form for e
 
