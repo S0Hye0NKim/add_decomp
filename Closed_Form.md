@@ -199,11 +199,11 @@ e\_i^{2(\\ell)(g)}}=\\delta\>0](https://latex.codecogs.com/png.latex?%5Cfrac%7B%
   
 ![\\frac{\\partial \\rho\_{\\tau\_{\\ell}}(e\_i^{(\\ell)(g)})}{\\partial
 e\_i^{(\\ell)(g)}}=\\begin{cases}\\tau\_\\ell-1\\quad&\\text{if
-}e\_i^{(\\ell)(g)}\<0\\\\\\{c\\in\\mathbb{R}:-\\tau\_\\ell\\le
-c\\le1-\\tau\_\\ell\\}\\quad&\\text{if
+}e\_i^{(\\ell)(g)}\<0\\\\\\{c\\in\\mathbb{R}:\\tau\_\\ell-1\\le
+c\\le\\tau\_\\ell\\}\\quad&\\text{if
 }e\_i^{(\\ell)(g)}=0\\\\\\tau\_\\ell\\quad&\\text{if
-}e\_i^{(\\ell)(g)}\>0\\end{cases}](https://latex.codecogs.com/png.latex?%5Cfrac%7B%5Cpartial%20%5Crho_%7B%5Ctau_%7B%5Cell%7D%7D%28e_i%5E%7B%28%5Cell%29%28g%29%7D%29%7D%7B%5Cpartial%20e_i%5E%7B%28%5Cell%29%28g%29%7D%7D%3D%5Cbegin%7Bcases%7D%5Ctau_%5Cell-1%5Cquad%26%5Ctext%7Bif%20%7De_i%5E%7B%28%5Cell%29%28g%29%7D%3C0%5C%5C%5C%7Bc%5Cin%5Cmathbb%7BR%7D%3A-%5Ctau_%5Cell%5Cle%20c%5Cle1-%5Ctau_%5Cell%5C%7D%5Cquad%26%5Ctext%7Bif%20%7De_i%5E%7B%28%5Cell%29%28g%29%7D%3D0%5C%5C%5Ctau_%5Cell%5Cquad%26%5Ctext%7Bif%20%7De_i%5E%7B%28%5Cell%29%28g%29%7D%3E0%5Cend%7Bcases%7D
-"\\frac{\\partial \\rho_{\\tau_{\\ell}}(e_i^{(\\ell)(g)})}{\\partial e_i^{(\\ell)(g)}}=\\begin{cases}\\tau_\\ell-1\\quad&\\text{if }e_i^{(\\ell)(g)}\<0\\\\\\{c\\in\\mathbb{R}:-\\tau_\\ell\\le c\\le1-\\tau_\\ell\\}\\quad&\\text{if }e_i^{(\\ell)(g)}=0\\\\\\tau_\\ell\\quad&\\text{if }e_i^{(\\ell)(g)}\>0\\end{cases}")  
+}e\_i^{(\\ell)(g)}\>0\\end{cases}](https://latex.codecogs.com/png.latex?%5Cfrac%7B%5Cpartial%20%5Crho_%7B%5Ctau_%7B%5Cell%7D%7D%28e_i%5E%7B%28%5Cell%29%28g%29%7D%29%7D%7B%5Cpartial%20e_i%5E%7B%28%5Cell%29%28g%29%7D%7D%3D%5Cbegin%7Bcases%7D%5Ctau_%5Cell-1%5Cquad%26%5Ctext%7Bif%20%7De_i%5E%7B%28%5Cell%29%28g%29%7D%3C0%5C%5C%5C%7Bc%5Cin%5Cmathbb%7BR%7D%3A%5Ctau_%5Cell-1%5Cle%20c%5Cle%5Ctau_%5Cell%5C%7D%5Cquad%26%5Ctext%7Bif%20%7De_i%5E%7B%28%5Cell%29%28g%29%7D%3D0%5C%5C%5Ctau_%5Cell%5Cquad%26%5Ctext%7Bif%20%7De_i%5E%7B%28%5Cell%29%28g%29%7D%3E0%5Cend%7Bcases%7D
+"\\frac{\\partial \\rho_{\\tau_{\\ell}}(e_i^{(\\ell)(g)})}{\\partial e_i^{(\\ell)(g)}}=\\begin{cases}\\tau_\\ell-1\\quad&\\text{if }e_i^{(\\ell)(g)}\<0\\\\\\{c\\in\\mathbb{R}:\\tau_\\ell-1\\le c\\le\\tau_\\ell\\}\\quad&\\text{if }e_i^{(\\ell)(g)}=0\\\\\\tau_\\ell\\quad&\\text{if }e_i^{(\\ell)(g)}\>0\\end{cases}")  
 
 Let
 ![\\epsilon\_i^{(\\ell)(g)}=Y\_i^{(g)}-X\_i^T\\alpha^{(g)}-V\_i^{(\\ell)}\\eta^{(g)}](https://latex.codecogs.com/png.latex?%5Cepsilon_i%5E%7B%28%5Cell%29%28g%29%7D%3DY_i%5E%7B%28g%29%7D-X_i%5ET%5Calpha%5E%7B%28g%29%7D-V_i%5E%7B%28%5Cell%29%7D%5Ceta%5E%7B%28g%29%7D
