@@ -122,10 +122,10 @@ List add_decomp(double delta, double lambda_1, double lambda_2, double tol_error
       arma::mat mat_U = u_old[l];
       for(int g=0; g<m; g++) {
         for(int i=0; i<n; i++) {
-          if(Error(i, g) + mat_U(i, g)/delta < (tau_seq(l)-1)/(n*delta)) {
-            mat_E(i, g) = Error(i, g) + mat_U(i, g)/delta - (tau_seq(l)-1)/(n*delta);
-          } else if(Error(i, g) + mat_U(i, g)/delta > tau_seq(l)/(n*delta)) {
-            mat_E(i, g) = Error(i, g) + mat_U(i, g)/delta - tau_seq(l)/(n*delta);
+          if(Error(i, g) + mat_U(i, g)/delta < (tau_seq(l)-1)/(n*b*delta)) {
+            mat_E(i, g) = Error(i, g) + mat_U(i, g)/delta - (tau_seq(l)-1)/(n*b*delta);
+          } else if(Error(i, g) + mat_U(i, g)/delta > tau_seq(l)/(n*b*delta)) {
+            mat_E(i, g) = Error(i, g) + mat_U(i, g)/delta - tau_seq(l)/(n*b*delta);
           } else {mat_E(i, g) = 0;}
         }
       }

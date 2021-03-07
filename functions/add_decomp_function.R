@@ -1,5 +1,5 @@
 add_decomp_r <- function(delta, lambda_1, lambda_2, tol_error, max_iter, X, Y, V, Phi, 
-                         theta_0, alpha_0, tau_seq) {
+                         theta_0, alpha_0, tau_seq, weight == TRUE) {
   # delta = step size
   # lambda_1 = low rank penalty
   # lambda_2 = sparse penalty
@@ -36,7 +36,7 @@ add_decomp_r <- function(delta, lambda_1, lambda_2, tol_error, max_iter, X, Y, V
     for (g in 1:m) {
       for(j in 1:(p+1)) {
         theta_tilde <- theta_0[(K*(j-1) +1):(j*K), g]
-        norm_theta_tilde <- (theta_tilde^2) %>% sum %>% sqrt   # weight = 1/norm_theta_tilde
+        norm_theta_tilde <- ifelse(weight == TRUE, (theta_tilde^2) %>% sum %>% sqrt, 1)  # weight = 1/norm_theta_tilde
         eta_j_g <- eta_new[(K*(j-1) +1):(j*K), g]
         w_j_g <- w_old[(K*(j-1) +1):(j*K), g]
         r_j_g <- eta_j_g - (w_j_g/delta)
@@ -50,12 +50,13 @@ add_decomp_r <- function(delta, lambda_1, lambda_2, tol_error, max_iter, X, Y, V
     
     # Process for Z=XA
     Y_list <- list()
-    for(i in 1:l) {Y_list[[i]] <- Y}
+    for(i in 1:b) {Y_list[[i]] <- Y}
     VH_list <- lapply(V, FUN = function(x) x %*% eta_new)
     obj_list <- mapply(function(Y, VH, E, U) Y - VH - E - U/delta, Y_list, VH_list, e_old, u_old, SIMPLIFY = FALSE)
     obj <- Reduce("+", obj_list)/b 
     SVD <- svd(obj)
-    sing_val_alpha_0 <- svd(alpha_0) %>% .$d  # weight = 1/sing_val_alpha_0
+    sing_val_alpha_0 <- ifelse(weight == TRUE, svd(alpha_0) %>% .$d, 
+                               rep(1, length(svd(alpha_0) %>% .$d)))  # weight = 1/sing_val_alpha_0
     new_singular <- sapply(SVD$d - lambda_1/(delta*b*sing_val_alpha_0), FUN = function(x) max(x, 0))
     Z_new <- SVD$u %*% diag(new_singular) %*% t(SVD$v)
     alpha_new <- solve(t(X) %*% X) %*% t(X) %*% Z_new
@@ -67,9 +68,9 @@ add_decomp_r <- function(delta, lambda_1, lambda_2, tol_error, max_iter, X, Y, V
       for(g in 1:m) {
         error <- Y[, g] - Z_new[, g] - V[[l]] %*% eta_new[, g]   #error = Y - XA - VH
         value <- error + u_old[[l]][, g]/delta
-        e_new[[l]][, g] <- case_when(value > tau_seq[l]/(n*delta) ~ value - tau_seq[l]/(n*delta), 
-                                     value < (tau_seq[l]-1)/(n*delta) ~ value - (tau_seq[l]-1)/(n*delta), 
-                                     value >=(tau_seq[l]-1)/(n*delta) & value <= tau_seq[l]/(n*delta) ~ 0)
+        e_new[[l]][, g] <- case_when(value > tau_seq[l]/(n*b*delta) ~ value - tau_seq[l]/(n*b*delta), 
+                                     value < (tau_seq[l]-1)/(n*b*delta) ~ value - (tau_seq[l]-1)/(n*b*delta), 
+                                     value >=(tau_seq[l]-1)/(n*b*delta) & value <= tau_seq[l]/(n*b*delta) ~ 0)
       }
     }
     
