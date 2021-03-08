@@ -185,7 +185,7 @@ cal_cl_sum <- function(e, tau_seq) {
 
 # parameter selection via BIC
 BIC_func <- function(X, Y, V, Phi, theta_0, alpha_0, tau_seq, tau_seq_real, lamb1_seq, lamb2_seq, 
-                     max_iter, table = FALSE) {
+                     max_iter) {
   m <- ncol(Y)
   p <- ncol(X) - 1
   K <- ncol(V[[1]])/(p+1)
@@ -213,6 +213,9 @@ BIC_func <- function(X, Y, V, Phi, theta_0, alpha_0, tau_seq, tau_seq_real, lamb
       result
     }
   stopCluster(cl)
+  
+  simulation <- lapply(simulation, FUN = function(x) `names<-`(x, value = paste0("lambda_2=", lamb2_seq)))
+  names(simulation) <- paste0("lambda_1=", lamb1_seq)
   
   BIC <- list()
   for(i in 1:length(lamb1_seq)) {
@@ -255,7 +258,10 @@ BIC_func <- function(X, Y, V, Phi, theta_0, alpha_0, tau_seq, tau_seq_real, lamb
                       BIC_log_n == BIC_val_min["log_n"] | BIC_llog_p == BIC_val_min["llog_p"] | 
                       BIC_llog_n == BIC_val_min["llog_n"])
   
-  if(table == TRUE) {
-    return(BIC_data)
-  } else {return(min_BIC)}
+  output <- list(min_BIC = min_BIC, 
+                 BIC_data = BIC_data, 
+                 simulation = simulation)
+  
+  
+  return(output)
 }
