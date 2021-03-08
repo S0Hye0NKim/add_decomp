@@ -1,5 +1,5 @@
 add_decomp_r <- function(delta, lambda_1, lambda_2, tol_error, max_iter, X, Y, V, Phi, 
-                         theta_0, alpha_0, tau_seq, weight == TRUE) {
+                         theta_0, alpha_0, tau_seq, weight = TRUE) {
   # delta = step size
   # lambda_1 = low rank penalty
   # lambda_2 = sparse penalty
