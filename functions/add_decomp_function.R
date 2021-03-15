@@ -55,8 +55,9 @@ add_decomp_r <- function(delta, lambda_1, lambda_2, tol_error, max_iter, X, Y, V
     obj_list <- mapply(function(Y, VH, E, U) Y - VH - E - U/delta, Y_list, VH_list, e_old, u_old, SIMPLIFY = FALSE)
     obj <- Reduce("+", obj_list)/b 
     SVD <- svd(obj)
-    sing_val_alpha_0 <- ifelse(weight == TRUE, svd(alpha_0) %>% .$d, 
-                               rep(1, length(svd(alpha_0) %>% .$d)))  # weight = 1/sing_val_alpha_0
+    if(weight == TRUE) {
+      sing_val_alpha_0 <- svd(alpha_0) %>% .$d
+    } else {sing_val_alpha_0 <- rep(1, length(svd(alpha_0) %>% .$d))}  # weight = 1/sing_val_alpha_0
     new_singular <- sapply(SVD$d - lambda_1/(delta*b*sing_val_alpha_0), FUN = function(x) max(x, 0))
     Z_new <- SVD$u %*% diag(new_singular) %*% t(SVD$v)
     alpha_new <- solve(t(X) %*% X) %*% t(X) %*% Z_new
