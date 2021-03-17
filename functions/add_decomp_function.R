@@ -238,11 +238,12 @@ BIC_func <- function(X, Y, V, Phi, theta_0, alpha_0, tau_seq, tau_seq_real, lamb
     }
   }
   
+  r_X <- rankMatrix(X)
   BIC_data <- lapply(BIC, FUN = function(x) `names<-`(x, value = lamb2_seq) %>% 
                        bind_rows(.id = "lambda_2")) %>%
     `names<-`(value = lamb1_seq) %>%
     bind_rows(.id = "lambda_1") %>%
-    mutate(term = (r_hat * (m + p - r_hat) + K * S_hat)/(2*n), 
+    mutate(term = (r_hat * min(r_X, m) + K * S_hat)/(2*n*m), 
            BIC_log_sum = log_Q + log(p+m)*term, 
            BIC_log_p = log_Q + log(p)*term, 
            BIC_log_n = log_Q + log(n)*term, 
