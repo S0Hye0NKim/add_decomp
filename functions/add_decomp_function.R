@@ -16,7 +16,7 @@ add_decomp_r <- function(delta, lambda_1, lambda_2, tol_error, max_iter, X, Y, V
   w_old <- matrix(0, nrow = (p+1)*K, ncol = m)
   
   iter_error <- matrix(ncol = 6, nrow = max_iter) %>%
-    `colnames<-`(value = c("eta", "theta", "alpha", "e", "u", "w"))
+    `colnames<-`(value = c("eta", "theta", "Z", "e", "u", "w"))
   
   sum_V <- Reduce("+", V)
   VV_prod <- lapply(V, FUN = function(x) t(x) %*% x)   # V^TV
@@ -60,7 +60,6 @@ add_decomp_r <- function(delta, lambda_1, lambda_2, tol_error, max_iter, X, Y, V
     } else {sing_val_alpha_0 <- rep(1, length(svd(alpha_0) %>% .$d))}  # weight = 1/sing_val_alpha_0
     new_singular <- sapply(SVD$d - lambda_1/(delta*b*sing_val_alpha_0), FUN = function(x) max(x, 0))
     Z_new <- SVD$u %*% diag(new_singular) %*% t(SVD$v)
-    alpha_new <- solve(t(X) %*% X) %*% t(X) %*% Z_new
     
     # Process for e
     e_new <- list()
@@ -87,7 +86,7 @@ add_decomp_r <- function(delta, lambda_1, lambda_2, tol_error, max_iter, X, Y, V
     # Update iteration error
     iter_error[iter, "eta"] <- Matrix::norm(eta_old - eta_new, type = "F")
     iter_error[iter, "theta"] <- Matrix::norm(theta_old - theta_new, type = "F")
-    iter_error[iter, "alpha"] <- Matrix::norm(alpha_old - alpha_new, type = "F")
+    iter_error[iter, "Z"] <- Matrix::norm(Z_old - Z_new, type = "F")
     e_diff <- mapply(FUN = function(old, new) old - new, e_old, e_new, SIMPLIFY = FALSE)  # sum of frobenius norm
     iter_error[iter, "e"] <- lapply(e_diff, FUN = function(x) Matrix::norm(x, type = "F")) %>% Reduce("+", .)
     u_diff <- mapply(FUN = function(old, new) old - new, u_old, u_new, SIMPLIFY = FALSE)
@@ -99,7 +98,6 @@ add_decomp_r <- function(delta, lambda_1, lambda_2, tol_error, max_iter, X, Y, V
     eta_old <- eta_new
     theta_old <- theta_new
     Z_old <- Z_new
-    alpha_old <- alpha_new
     e_old <- e_new
     u_old <- u_new
     w_old <- w_new
@@ -107,7 +105,7 @@ add_decomp_r <- function(delta, lambda_1, lambda_2, tol_error, max_iter, X, Y, V
   
   return(list(eta = eta_new, 
               theta = theta_new, 
-              alpha = alpha_new, 
+              Z = Z_new, 
               e = e_new, 
               u = u_new, 
               w = w_new, 

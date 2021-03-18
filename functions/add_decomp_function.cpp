@@ -111,7 +111,6 @@ List add_decomp(double delta, double lambda_1, double lambda_2, double tol_error
                                       as<NumericVector>(wrap(d_new)), 0);
     arma::mat D_new = diagmat(as<arma::vec>(wrap(diag_entry)));
     arma::mat Z_new = P*D_new*Q.t();
-    arma::mat alpha_new = inv(X.t()*X)*X.t()*Z_new;
     
     //Process for e
     List e_new = List(b);
@@ -148,7 +147,7 @@ List add_decomp(double delta, double lambda_1, double lambda_2, double tol_error
     //Update iteration error
     iter_error(iter, 0) = norm(eta_old - eta_new, "fro"); 
     iter_error(iter, 1) = norm(theta_old - theta_new, "fro");
-    iter_error(iter, 2) = norm(alpha_old - alpha_new, "fro");
+    iter_error(iter, 2) = norm(Z_old - Z_new, "fro");
     List diff_e = List(b);
     List diff_u = List(b);
     for(int l=0; l<b; l++) {
@@ -173,7 +172,6 @@ List add_decomp(double delta, double lambda_1, double lambda_2, double tol_error
     eta_old = eta_new;
     theta_old = theta_new;
     Z_old = Z_new;
-    alpha_old = alpha_new;
     e_old = e_new;
     u_old = u_new;
     w_old = w_new;
@@ -182,7 +180,7 @@ List add_decomp(double delta, double lambda_1, double lambda_2, double tol_error
   //result
   List estimate = List::create(Named("eta") = eta_old, 
                                Named("theta") = theta_old, 
-                               Named("alpha") = alpha_old, 
+                               Named("Z") = Z_old, 
                                Named("e") = e_old, 
                                Named("u") = u_old, 
                                Named("w") = w_old, 
