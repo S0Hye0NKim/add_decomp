@@ -182,7 +182,7 @@ cal_cl_sum <- function(e, tau_seq) {
 
 
 # parameter selection via BIC
-BIC_func <- function(X, Y, V, Phi, theta_0, alpha_0, tau_seq, tau_seq_real, lamb1_seq, lamb2_seq, 
+BIC_func <- function(X, Y, V, Phi, theta_0, Z_0, tau_seq, tau_seq_real, lamb1_seq, lamb2_seq, 
                      max_iter) {
   m <- ncol(Y)
   p <- ncol(X) - 1
@@ -206,7 +206,7 @@ BIC_func <- function(X, Y, V, Phi, theta_0, alpha_0, tau_seq, tau_seq_real, lamb
       
       result <- add_decomp(delta = 1, lambda_1 = lambda_1, lambda_2 = lambda_2, tol_error = 0.001, 
                            max_iter = max_iter, X = X, Y = Y, V = V, Phi = Phi, 
-                           theta_0, alpha_0, tau_seq = tau_seq)
+                           theta_0, Z_0, tau_seq = tau_seq)
       
       result
     }
@@ -220,17 +220,17 @@ BIC_func <- function(X, Y, V, Phi, theta_0, alpha_0, tau_seq, tau_seq_real, lamb
     BIC[[i]] <- list()
     for(j in 1:length(lamb2_seq)) {
       result <- simulation[[i]][[j]]
-      est_error <- lapply(V[idx_tau], FUN = function(x) (Y - X %*% result$alpha - x %*% result$theta)
+      est_error <- lapply(V[idx_tau], FUN = function(x) (Y - result$Z - x %*% result$theta)
                           %>% as.vector())
       check_loss_err <- mapply(FUN = function(x, tau) check_ft(x, tau), x = est_error, 
                                tau = as.list(tau_seq_real), SIMPLIFY = FALSE) %>%
-        lapply(FUN = function(x) sum(x)/n) %>% unlist %>% sum
+        lapply(FUN = function(x) sum(x)) %>% unlist %>% sum
       gamma_tau_hat <- est_gamma(Phi[idx_tau, ], result$theta)
       S_hat <- check_sp_table(true = matrix(0, nrow = (p+1), ncol = m), 
                               est = gamma_tau_hat, table = TRUE, tol = 0.1^5, tau_seq = tau_seq_real) %>%
         .$Est_Positive %>% sum
       BIC[[i]][[j]] <- data.frame(log_Q = log(check_loss_err), 
-                                  r_hat = rankMatrix(result$alpha)[1], 
+                                  r_hat = rankMatrix(result$Z)[1], 
                                   S_hat = S_hat)
     }
   }
