@@ -190,27 +190,16 @@ BIC_func <- function(X, Y, V, Phi, theta_0, Z_0, tau_seq, tau_seq_real, lamb1_se
   idx_tau <- tau_seq %in% tau_seq_real
   
   # iteration for lamb1_seq and lamb2_seq
-  cores=detectCores()
-  cl <- makeCluster(cores[1]-2) #not to overload your computer
-  registerDoParallel(cl) # Ready to parallel
-  
-  simulation <- foreach(lambda_1 = lamb1_seq, .noexport = "add_decomp") %:%
-    foreach(lambda_2 = lamb2_seq, .noexport = "add_decomp") %dopar% {
-      library(tidyverse)
-      library(splines)
-      library(Matrix)
-      library(Rcpp)
-      library(glmnet)
-      library(fda)
-      sourceCpp("functions/add_decomp_function.cpp")
-      
-      result <- add_decomp(delta = 1, lambda_1 = lambda_1, lambda_2 = lambda_2, tol_error = 0.001, 
-                           max_iter = max_iter, X = X, Y = Y, V = V, Phi = Phi, 
-                           theta_0, Z_0, tau_seq = tau_seq)
-      
-      result
+  simulation <- list()
+  for(lamb1_idx in 1:length(lamb1_seq)) {
+    simulation[[lamb1_idx]] <- list()
+    for(lamb2_idx in 1:length(lamb2_seq)) {
+      simulation[[lamb1_idx]][[lamb2_idx]] <- add_decomp(delta = 1, lambda_1 = lamb1_seq[lamb1_idx], 
+                                                         lambda_2 = lamb2_seq[lamb2_idx], tol_error = 0.001, 
+                                                         max_iter = max_iter, X = X, Y = Y, V = V, Phi = Phi, 
+                                                         theta_0, Z_0, tau_seq = tau_seq)
     }
-  stopCluster(cl)
+  }
   
   simulation <- lapply(simulation, FUN = function(x) `names<-`(x, value = paste0("lambda_2=", lamb2_seq)))
   names(simulation) <- paste0("lambda_1=", lamb1_seq)
