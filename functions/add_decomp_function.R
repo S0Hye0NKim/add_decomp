@@ -1,5 +1,5 @@
 add_decomp_r <- function(delta, lambda_1, lambda_2, tol_error, max_iter, X, Y, V, Phi, 
-                         theta_0, alpha_0, tau_seq, weight = TRUE) {
+                         theta_0, Z_0, tau_seq, weight = TRUE) {
   # delta = step size
   # lambda_1 = low rank penalty
   # lambda_2 = sparse penalty
@@ -7,8 +7,7 @@ add_decomp_r <- function(delta, lambda_1, lambda_2, tol_error, max_iter, X, Y, V
   # initial value
   eta_old <- theta_0
   theta_old <- eta_old
-  alpha_old <- alpha_0
-  Z_old <- X %*% alpha_old
+  Z_old <- Z_0
   e_old <- list()
   for(l in 1:b) {e_old[[l]] <- Y - Z_old - V[[l]] %*% eta_old}
   u_old <- list()
@@ -56,9 +55,9 @@ add_decomp_r <- function(delta, lambda_1, lambda_2, tol_error, max_iter, X, Y, V
     obj <- Reduce("+", obj_list)/b 
     SVD <- svd(obj)
     if(weight == TRUE) {
-      sing_val_alpha_0 <- svd(alpha_0) %>% .$d
-    } else {sing_val_alpha_0 <- rep(1, length(svd(alpha_0) %>% .$d))}  # weight = 1/sing_val_alpha_0
-    new_singular <- sapply(SVD$d - lambda_1/(delta*b*sing_val_alpha_0), FUN = function(x) max(x, 0))
+      sing_val_Z_0 <- svd(Z_0) %>% .$d
+    } else {sing_val_Z_0 <- rep(1, length(svd(Z_0) %>% .$d))}  # weight = 1/sing_val_Z_0
+    new_singular <- sapply(SVD$d - lambda_1/(delta*b*sing_val_Z_0), FUN = function(x) max(x, 0))
     Z_new <- SVD$u %*% diag(new_singular) %*% t(SVD$v)
     
     # Process for e
