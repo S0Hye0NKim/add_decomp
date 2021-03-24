@@ -112,6 +112,8 @@ $$y_{ik}=x_i^TB(\tau)^{(k)}+x_i^T\xi^{(k)}\epsilon_i\text{ where }\xi_3^{(k)}=1,
 
 
 $$\epsilon\sim N(0, 1)$$
+
+
 ## 0. Initial Setting
 
 ```{r}
@@ -179,7 +181,8 @@ Y_list <- mapply(FUN = function(X, LR, SP, xi, eps) X %*% (LR + SP) + X %*% xi *
 
 # Case 3. 
 
-$$\epsilon_i^{(g)}(\tau)\sim\text{Laplace}(0, \sigma_i^{(g)}),\text{ where }\sigma_i^{(g)}\overset{i.i.d}{\sim}U(0.4, 0.7)$$
+ * Same as Example 1 except that $\epsilon_i^{(g)}\sim\text{Laplace}(0, \sigma_i)$, $\sigma_i \sim U(0.4, 0.7)$
+
 
 
 ## 0. Initial Setting
@@ -192,11 +195,12 @@ m <- 10
 p <- 30
 b <- 15
 num_rank <- 5
+num_rank_X <- 10
 simul_times <- 100
 
-sigma_mat <- matrix(nrow = p, ncol = p)
-for(j in 1:p) {
-  for(k in 1:p) {
+sigma_mat <- matrix(nrow = num_rank_X, ncol = num_rank_X)
+for(j in 1:num_rank_X) {
+  for(k in 1:num_rank_X) {
     sigma_mat[j, k] <- 0.3^(abs(j-k))
   }
 }
@@ -207,9 +211,14 @@ sp_mat_list <- list()
 eps_list <- list()
 
 for(simul in 1:simul_times) {
-  X <- matrix(rnorm(n*p, mean = 0, sd = 1), nrow = n)
-  X_list[[simul]] <- X %*% expm::sqrtm(sigma_mat) %>%
-    cbind(rep(1, n), .)
+  X <- matrix(rnorm(n*num_rank_X, mean = 0, sd = 1), nrow = n)
+  X <- X %*% expm::sqrtm(sigma_mat)
+  X <- cbind(X, X, X)
+  for(j in 11:20) {
+    X[, j] <- X[, j-10] + X[, j-9]
+    X[, (j+10)] <- X[, j-10] + X[, j-8]
+  }
+  X_list[[simul]] <- X %>% cbind(rep(1, n), .)
   
   col_ind <- sample(1:m, size = m, replace = FALSE)
   row_ind <- sample(1:(p+1), size = m)
@@ -218,25 +227,20 @@ for(simul in 1:simul_times) {
     sp_mat_list[[simul]][row_ind[i], col_ind[i]] <- rnorm(1, mean = 5, sd = 0.1)
   }
   
-  LR_mat <- matrix(rnorm((p+1)*m, mean = 1, sd = 0.1), ncol = m) # make low rank matrix using SVD
+  LR_mat <- matrix(rnorm((p+1)*m, mean = 0, sd = 1), ncol = m) # make low rank matrix using SVD
   SVD <- svd(LR_mat)
-  D_mat <- diag(SVD$d)
-  idx <- (num_rank+1):m
+  D_mat <- diag(runif(num_rank, min = 2, max = 2.3) %>% sort(decreasing = TRUE), nrow = length(SVD$d))
+  idx <- (num_rank+1):min(m, p)
   D_mat[idx, idx] <- 0
   LR_mat_list[[simul]] <- SVD$u %*% D_mat %*% t(SVD$v)
   
-  eps_list[[simul]] <- matrix(nrow = n, ncol = m)
-  for(i in 1:n) {
-    for(j in 1:m) {
-      sigma <- runif(1, 0.4, 0.7)
-      eps_list[[simul]][i, j] <- LaplacesDemon::rlaplace(1, location = 0, scale = sigma)
-    }
-  }
+  sigma <- runif(n*m,0.4, 0.7)
+  eps_entry <- sapply(sigma, FUN = function(x) LaplacesDemon::rlaplace(1, location = 0, scale = x))
+  eps_list[[simul]] <- matrix(eps_entry, nrow = n, ncol = m)
 }
 
 Y_list <- mapply(FUN = function(X, LR, SP, eps) X %*% (LR + SP) + eps, 
                  X_list, LR_mat_list, sp_mat_list, eps_list, SIMPLIFY = FALSE)
-
 
 
 ```
@@ -285,7 +289,7 @@ simulation <- foreach(simul = 1:simul_times, .noexport = "add_decomp") %dopar% {
     cv.lasso <- cv.glmnet(x = X[, -1], y = Y[, g], 
                           alpha = 1, type.measure = "mae")
     lasso_model <- glmnet(X[, -1], Y[, g], 
-                          family = "gaussian", alpha = 1, lambda = cv.lasso$lambda.min)
+                          family = "gaussian", alpha = 1, lambda = 0.01)
     lasso_coef[, g] <- c(lasso_model$a0, as.vector(lasso_model$beta))
   }
   
@@ -305,12 +309,12 @@ simulation <- foreach(simul = 1:simul_times, .noexport = "add_decomp") %dopar% {
     }
   alpha_init <- ridge_coef
   
-  init_val <- add_decomp_r(delta = 1, lambda_1 = 0.7, lambda_2 = 5, tol_error = 0.1, max_iter = 50,
+  init_val <- add_decomp_r(delta = 1, lambda_1 = 0.01, lambda_2 = 0.2, tol_error = 0.1, max_iter = 50,
                            X = X, Y = Y, V = V, Phi = Phi, 
                            theta_0 = theta_init, Z_0 = X%*%alpha_init, tau_seq = tau_seq, weight = FALSE)
   
-  lamb1_seq <- c( seq(0.05, 0.5, by = 0.05))
-  lamb2_seq <- c(seq(3, 7, by = 0.5))
+  lamb1_seq <- c( seq(0.08, 0.2, by = 0.01))
+  lamb2_seq <- c(seq(0.5, 2, by = 0.1))
   BIC_simul <- BIC_func(X, Y, V, Phi, theta_0 = init_val$theta, Z_0 = init_val$Z, tau_seq, tau_seq_real, 
                         lamb1_seq = lamb1_seq, lamb2_seq = lamb2_seq, max_iter = 50)
   
