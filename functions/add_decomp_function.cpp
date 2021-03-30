@@ -93,7 +93,7 @@ List add_decomp(double delta, double lambda_1, double lambda_2, double tol_error
     //Process for Z = XA
     arma::mat sum_E = as<arma::mat>(wrap(f(Named("f") = "+", Named("x") = e_old)));
     arma::mat sum_U = as<arma::mat>(wrap(f(Named("f") = "+", Named("x") = u_old)));
-    arma::mat obj = Y - (1/b)*sum_V*eta_new - (1/b)*sum_E - (1/(delta*b))*sum_U;
+    arma::mat obj = Y - (1/b)*sum_V*eta_new - (1/b)*sum_E + (1/(delta*b))*sum_U;
     arma::mat P;
     arma::mat Q;
     arma::vec d;

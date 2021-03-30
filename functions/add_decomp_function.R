@@ -51,7 +51,7 @@ add_decomp_r <- function(delta, lambda_1, lambda_2, tol_error, max_iter, X, Y, V
     Y_list <- list()
     for(i in 1:b) {Y_list[[i]] <- Y}
     VH_list <- lapply(V, FUN = function(x) x %*% eta_new)
-    obj_list <- mapply(function(Y, VH, E, U) Y - VH - E - U/delta, Y_list, VH_list, e_old, u_old, SIMPLIFY = FALSE)
+    obj_list <- mapply(function(Y, VH, E, U) Y - VH - E + U/delta, Y_list, VH_list, e_old, u_old, SIMPLIFY = FALSE)
     obj <- Reduce("+", obj_list)/b 
     SVD <- svd(obj)
     if(weight == TRUE) {
