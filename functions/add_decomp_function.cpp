@@ -6,7 +6,8 @@ using namespace Rcpp;
 
 //[[Rcpp::export]]
 List add_decomp(double delta, double lambda_1, double lambda_2, double tol_error, int max_iter, arma::mat X,
-                arma::mat Y, List V, arma::mat Phi, arma::mat theta_0, arma::mat Z_0, NumericVector tau_seq) {
+                arma::mat Y, List V, arma::mat Phi, arma::mat theta_0, arma::mat Z_0, NumericVector tau_seq,
+                bool weight) {
   Function f("Reduce");
   //delta = step size
   //lambda_1 = low rank penalty
@@ -81,7 +82,12 @@ List add_decomp(double delta, double lambda_1, double lambda_2, double tol_error
         }
         double norm_r_j_g = sqrt(accum_r_j_g);
         double norm_theta_tilde_j_g = sqrt(accum_theta_tilde_j_g);
-        double value = 1 - (lambda_2/(delta*norm_r_j_g*norm_theta_tilde_j_g));
+        double value; 
+        if(weight == true) {
+          value = 1 - (lambda_2/(delta*norm_r_j_g*norm_theta_tilde_j_g));
+        } else {
+          value = 1 - (lambda_2/(delta*norm_r_j_g));
+        }
         if(value >= 0) {
           theta_new.submat(K*j, g, K*(j+1)-1, g) = value * r_j_g;
         } else {
@@ -100,12 +106,17 @@ List add_decomp(double delta, double lambda_1, double lambda_2, double tol_error
     arma::svd(P, d, Q, obj);
     if(m > n) {Q = Q.cols(0, n-1);}
     if(n > m) {P = P.cols(0, m-1);}
-    // adaptive weight
     arma::mat Z_0_P;
     arma::mat Z_0_Q;
     arma::vec Z_0_d;
     arma::svd(Z_0_P, Z_0_d, Z_0_Q, Z_0);
-    arma::vec d_new = d - lambda_1/(delta*b*Z_0_d);
+    arma::vec d_new;
+    
+    if(weight == true) {
+      d_new = d - lambda_1/(delta*b*Z_0_d);
+    } else {
+      d_new = d - lambda_1/(delta*b);
+    }
     NumericVector diag_entry = ifelse(as<NumericVector>(wrap(d_new)) > 0, 
                                       as<NumericVector>(wrap(d_new)), 0);
     arma::mat D_new = diagmat(as<arma::vec>(wrap(diag_entry)));
