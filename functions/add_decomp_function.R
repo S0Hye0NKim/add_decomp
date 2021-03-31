@@ -182,7 +182,7 @@ cal_cl_sum <- function(e, tau_seq) {
 
 
 # parameter selection via BIC
-BIC_func <- function(X, Y, V, Phi, theta_0, Z_0, tau_seq, tau_seq_real, lamb1_seq, lamb2_seq, 
+add_decomp_BIC <- function(X, Y, V, Phi, theta_0, Z_0, tau_seq, tau_seq_real, lamb1_seq, lamb2_seq, 
                      max_iter) {
   m <- ncol(Y)
   p <- ncol(X) - 1
@@ -250,6 +250,115 @@ BIC_func <- function(X, Y, V, Phi, theta_0, Z_0, tau_seq, tau_seq_real, lamb1_se
                  BIC_data = BIC_data, 
                  simulation = simulation)
   
+  
+  return(output)
+}
+
+# parameter selection via BIC
+LR_model_BIC <- function(X, Y, Z_0, tau_seq, tau_seq_real, lamb_seq, max_iter) {
+  m <- ncol(Y)
+  p <- ncol(X) - 1
+  idx_tau <- tau_seq %in% tau_seq_real
+  
+  # iteration for lamb_seq
+  simulation <- list()
+  for(lamb_idx in 1:length(lamb_seq)) {
+    simulation[[lamb_idx]] <- LR_model(delta = 1, lambda = lamb_seq[lamb_idx], tol_error = 0.001, 
+                                       max_iter = max_iter, X = X, Y = Y, Z_0 = Z_0, tau_seq = tau_seq, weight = TRUE)
+  }
+  
+  names(simulation) <- paste0("lambda=", lamb_seq)
+  
+  BIC <- list()
+  for(i in 1:length(lamb_seq)) {
+    result <- simulation[[i]]
+    est_error <- Y - result$Z
+    check_loss_err <- lapply(as.list(tau_seq_real), FUN = function(x) check_ft(est_error, x)) %>%
+      Reduce("+", .) %>% as.vector %>% sum
+    BIC[[i]] <- data.frame(log_Q = log(check_loss_err), r_hat = rankMatrix(result$Z)[1])
+  }
+  
+  r_X <- rankMatrix(X)
+  names(BIC) <- lamb_seq
+  BIC_data <- BIC %>% bind_rows(.id = "lambda") %>%
+    mutate(term = (r_hat * min(r_X, m))/(2*n*m), 
+           BIC_log_sum = log_Q + log(p+m)*term, 
+           BIC_log_p = log_Q + log(p)*term, 
+           BIC_log_n = log_Q + log(n)*term, 
+           BIC_llog_p = log_Q + log(log(p))*term,
+           BIC_llog_n = log_Q + log(log(n))*term) %>%
+    group_by(lambda) %>%
+    select_at(vars(starts_with("BIC"))) %>%
+    ungroup()
+  
+  BIC_val_min <- apply(select_at(BIC_data, vars(starts_with("BIC"))), 2, min) %>%
+    `names<-`(value = c("log_sum", "log_p", "log_n", "llog_p", "llog_n"))
+  
+  min_BIC <- filter(BIC_data, BIC_log_sum == BIC_val_min["log_sum"]| BIC_log_p == BIC_val_min["log_p"] |
+                      BIC_log_n == BIC_val_min["log_n"] | BIC_llog_p == BIC_val_min["llog_p"] | 
+                      BIC_llog_n == BIC_val_min["llog_n"])
+  
+  output <- list(min_BIC = min_BIC, 
+                 BIC_data = BIC_data, 
+                 simulation = simulation)
+  
+  return(output)
+}
+
+# parameter selection via BIC
+SP_model_BIC <- function(X, Y, V, Phi, theta_0, tau_seq, tau_seq_real, lamb_seq, max_iter) {
+  m <- ncol(Y)
+  p <- ncol(X) - 1
+  K <- ncol(V[[1]])/(p+1)
+  idx_tau <- tau_seq %in% tau_seq_real
+  
+  # iteration for lamb1_seq and lamb2_seq
+  simulation <- list()
+  for(lamb_idx in 1:length(lamb_seq)) {
+    simulation[[lamb_idx]] <- SP_model(delta = 1, lambda = lamb_seq[lamb_idx], tol_error = 0.1^5, 
+                                       max_iter = max_iter, X = X, Y = Y, V = V, Phi = Phi, theta_0 = theta_0, 
+                                       tau_seq = tau_seq, weight = TRUE)
+  }
+  
+  names(simulation) <- paste0("lambda=", lamb_seq)
+  
+  BIC <- list()
+  for(i in 1:length(lamb_seq)) {
+    result <- simulation[[i]]
+    est_error <- lapply(V[idx_tau], FUN = function(x) (Y - x %*% result$theta)
+                        %>% as.vector())
+    check_loss_err <- mapply(FUN = function(x, tau) check_ft(x, tau), x = est_error, 
+                             tau = as.list(tau_seq_real), SIMPLIFY = FALSE) %>%
+      lapply(FUN = function(x) sum(x)) %>% unlist %>% sum
+    gamma_tau_hat <- est_gamma(Phi[idx_tau, ], result$theta)
+    S_hat <- check_sp_table(true = matrix(0, nrow = (p+1), ncol = m), 
+                            est = gamma_tau_hat, table = TRUE, tol = 0.1^5, tau_seq = tau_seq_real) %>%
+      .$Est_Positive %>% sum
+    BIC[[i]] <- data.frame(log_Q = log(check_loss_err), S_hat = S_hat)
+  }
+  
+  names(BIC) <- lamb_seq
+  BIC_data <- BIC %>% bind_rows(.id = "lambda") %>%
+    mutate(term = (K * S_hat)/(2*n*m), 
+           BIC_log_sum = log_Q + log(p+m)*term, 
+           BIC_log_p = log_Q + log(p)*term, 
+           BIC_log_n = log_Q + log(n)*term, 
+           BIC_llog_p = log_Q + log(log(p))*term,
+           BIC_llog_n = log_Q + log(log(n))*term) %>%
+    group_by(lambda) %>%
+    select_at(vars(starts_with("BIC"))) %>%
+    ungroup()
+  
+  BIC_val_min <- apply(select_at(BIC_data, vars(starts_with("BIC"))), 2, min) %>%
+    `names<-`(value = c("log_sum", "log_p", "log_n", "llog_p", "llog_n"))
+  
+  min_BIC <- filter(BIC_data, BIC_log_sum == BIC_val_min["log_sum"]| BIC_log_p == BIC_val_min["log_p"] |
+                      BIC_log_n == BIC_val_min["log_n"] | BIC_llog_p == BIC_val_min["llog_p"] | 
+                      BIC_llog_n == BIC_val_min["llog_n"])
+  
+  output <- list(min_BIC = min_BIC, 
+                 BIC_data = BIC_data, 
+                 simulation = simulation)
   
   return(output)
 }
