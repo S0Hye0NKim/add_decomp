@@ -176,6 +176,9 @@ List add_decomp(double delta, double lambda_1, double lambda_2, double tol_error
     w_old = w_new;
     
   }
+  
+  DataFrame params = DataFrame::create(Named("lambda_1")=lambda_1, Named("lambda_2")=lambda_2);
+  
   //result
   List estimate = List::create(Named("eta") = eta_old, 
                                Named("theta") = theta_old, 
@@ -183,7 +186,8 @@ List add_decomp(double delta, double lambda_1, double lambda_2, double tol_error
                                Named("e") = e_old, 
                                Named("u") = u_old, 
                                Named("w") = w_old, 
-                               Named("iter_error") = iter_error);
+                               Named("iter_error") = iter_error, 
+                               Named("params") = params);
   
   
   
@@ -191,6 +195,7 @@ List add_decomp(double delta, double lambda_1, double lambda_2, double tol_error
   
   return estimate;
 }
+
 
 //calculate_kronecker_product_V.cpp
 //[[Rcpp::export]]
