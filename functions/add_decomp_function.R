@@ -264,7 +264,7 @@ LR_model_BIC <- function(X, Y, Z_0, tau_seq, tau_seq_real, lamb_seq, max_iter) {
   # iteration for lamb_seq
   simulation <- list()
   for(lamb_idx in 1:length(lamb_seq)) {
-    simulation[[lamb_idx]] <- LR_model(delta = 1, lambda = lamb_seq[lamb_idx], tol_error = 0.1^5, 
+    simulation[[lamb_idx]] <- LR_model_r(delta = 1, lambda = lamb_seq[lamb_idx], tol_error = 0.1^5, 
                                        max_iter = max_iter, X = X, Y = Y, Z_0 = Z_0, tau_seq = tau_seq, weight = TRUE)
   }
   
@@ -316,7 +316,7 @@ SP_model_BIC <- function(X, Y, V, Phi, theta_0, tau_seq, tau_seq_real, lamb_seq,
   # iteration for lamb1_seq and lamb2_seq
   simulation <- list()
   for(lamb_idx in 1:length(lamb_seq)) {
-    simulation[[lamb_idx]] <- SP_model(delta = 1, lambda = lamb_seq[lamb_idx], tol_error = 0.1^5, 
+    simulation[[lamb_idx]] <- SP_model_r(delta = 1, lambda = lamb_seq[lamb_idx], tol_error = 0.1^5, 
                                        max_iter = max_iter, X = X, Y = Y, V = V, Phi = Phi, theta_0 = theta_0, 
                                        tau_seq = tau_seq, weight = TRUE)
   }
