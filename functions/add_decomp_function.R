@@ -363,3 +363,169 @@ SP_model_BIC <- function(X, Y, V, Phi, theta_0, tau_seq, tau_seq_real, lamb_seq,
   
   return(output)
 }
+
+# Low rank model 
+LR_model_r <- function(delta, lambda, tol_error, max_iter, X, Y, Z_0, tau_seq, weight) {
+  n <- nrow(X)
+  p <- ncol(X) - 1
+  b <- length(tau_seq)
+  m <- ncol(Y)
+  Z_old <- Z_0
+  e_old <- list()
+  u_old <- list()
+  for(l in 1:b) {
+    e_old[[l]] <- Y- Z_old
+    u_old[[l]] <- matrix(0, nrow = n, ncol = m)
+  }
+  iter_error <- matrix(ncol = 3, nrow = max_iter) %>%
+    `colnames<-`(value = c("Z", "e", "u"))
+  
+  for(iter in 1:max_iter) {
+    # Process for Z
+    sum_E <- Reduce("+", e_old)
+    sum_U <- Reduce("+", u_old)
+    obj <- Y - sum_E/b + (1/(delta*b))*sum_U
+    SVD_obj <- svd(obj)
+    SVD_Z_0 <- svd(Z_0)
+    if(weight == TRUE) {
+      d_new <- SVD_obj$d - lambda/(delta*b*SVD_Z_0$d)
+    } else {
+      d_new <- SVD_obj$d - lambda/(delta*b)
+    }
+    diag_entry <- ifelse(d_new > 0, d_new, 0)
+    Z_new <- SVD_obj$u %*% diag(diag_entry) %*% t(SVD_obj$v)
+    
+    # Process for e
+    e_new <- list()
+    for(l in 1:b){
+      e_new[[l]] <- matrix(nrow = n, ncol = m)
+      for(g in 1:m) {
+        error <- Y[, g] - Z_new[, g]   #error = Y - XA
+        value <- error + u_old[[l]][, g]/delta
+        e_new[[l]][, g] <- case_when(value > tau_seq[l]/(n*b*delta) ~ value - tau_seq[l]/(n*b*delta), 
+                                     value < (tau_seq[l]-1)/(n*b*delta) ~ value - (tau_seq[l]-1)/(n*b*delta), 
+                                     value >=(tau_seq[l]-1)/(n*b*delta) & value <= tau_seq[l]/(n*b*delta) ~ 0)
+      }
+    }
+    
+    # Process for u
+    u_new <- list()
+    for(l in 1:b) {
+      u_new[[l]] <- u_old[[l]] + delta * (Y - Z_new - e_new[[l]])
+    }
+    
+    # update iteration error
+    iter_error[iter, "Z"] <- Matrix::norm(Z_old - Z_new, type = "F")
+    e_diff <- mapply(FUN = function(old, new) old - new, e_old, e_new, SIMPLIFY = FALSE)  
+    iter_error[iter, "e"] <- lapply(e_diff, FUN = function(x) Matrix::norm(x, type = "F")) %>% Reduce("+", .)
+    u_diff <- mapply(FUN = function(old, new) old - new, u_old, u_new, SIMPLIFY = FALSE)
+    iter_error[iter, "u"] <- lapply(u_diff, FUN = function(x) Matrix::norm(x, type = "F")) %>% Reduce("+", .)
+    
+    if(sum(iter_error[iter, ]) < tol_error) break
+    
+    Z_old <- Z_new
+    e_old <- e_new
+    u_old <- u_new
+  }
+  
+  return(list(Z = Z_new, 
+              e = e_new, 
+              u = u_new, 
+              iter_error = iter_error, 
+              params = lambda))
+  
+}
+
+# Sparse model
+SP_model_r <- function(delta, lambda, tol_error, max_iter, X, Y, V, Phi, 
+                       theta_0, tau_seq, weight = TRUE) {
+  # initial value
+  eta_old <- theta_0
+  theta_old <- eta_old
+  e_old <- list()
+  for(l in 1:b) {e_old[[l]] <- Y - Z_old - V[[l]] %*% eta_old}
+  u_old <- list()
+  for(l in 1:b) {u_old[[l]] <- matrix(0, nrow = n, ncol = m)}
+  w_old <- matrix(0, nrow = (p+1)*K, ncol = m)
+  
+  iter_error <- matrix(ncol = 5, nrow = max_iter) %>%
+    `colnames<-`(value = c("eta", "theta", "e", "u", "w"))
+  
+  sum_V <- Reduce("+", V)
+  VV_prod <- lapply(V, FUN = function(x) t(x) %*% x)   # V^TV
+  sum_VV <- Reduce("+", VV_prod)
+  
+  for(iter in 1:max_iter) {
+    # Process for eta
+    eta_new <- matrix(nrow = (p+1)*K, ncol = m)
+    Vu_prod <- mapply(function(x,y) t(x) %*% y, V, u_old, SIMPLIFY = FALSE)
+    Ve_prod <- mapply(function(x,y) t(x) %*% y, V, e_old, SIMPLIFY = FALSE)
+    eta_new <- (solve(sum_VV+diag(1, (p+1)*K))/delta) %*% (w_old + delta * theta_old + Reduce("+", Vu_prod)
+                                                           + delta * t(sum_V) %*% (Y)
+                                                           - delta * Reduce("+", Ve_prod))
+    
+    # Process for theta
+    theta_new <- matrix(nrow = (p+1)*K, ncol = m)
+    for (g in 1:m) {
+      for(j in 1:(p+1)) {
+        theta_tilde <- theta_0[(K*(j-1) +1):(j*K), g]
+        norm_theta_tilde <- ifelse(weight == TRUE, (theta_tilde^2) %>% sum %>% sqrt, 1)  # weight = 1/norm_theta_tilde
+        eta_j_g <- eta_new[(K*(j-1) +1):(j*K), g]
+        w_j_g <- w_old[(K*(j-1) +1):(j*K), g]
+        r_j_g <- eta_j_g - (w_j_g/delta)
+        norm_r_j_g <- (r_j_g^2) %>% sum %>% sqrt
+        value <- 1 - (lambda/(delta *norm_r_j_g*norm_theta_tilde))
+        if(value >= 0) {
+          theta_new[(K*(j-1) +1):(j*K), g] <- value * r_j_g
+        } else {theta_new[(K*(j-1) +1):(j*K), g] <- 0}
+      }
+    }
+    
+    # Process for e
+    e_new <- list()
+    for(l in 1:b){
+      e_new[[l]] <- matrix(nrow = n, ncol = m)
+      for(g in 1:m) {
+        error <- Y[, g]  - V[[l]] %*% eta_new[, g]   #error = Y - VH
+        value <- error + u_old[[l]][, g]/delta
+        e_new[[l]][, g] <- case_when(value > tau_seq[l]/(n*b*delta) ~ value - tau_seq[l]/(n*b*delta), 
+                                     value < (tau_seq[l]-1)/(n*b*delta) ~ value - (tau_seq[l]-1)/(n*b*delta), 
+                                     value >=(tau_seq[l]-1)/(n*b*delta) & value <= tau_seq[l]/(n*b*delta) ~ 0)
+      }
+    }
+    
+    # Process for multiplier u
+    u_new <- list()
+    for(l in 1:b) {
+      u_new[[l]] <- u_old[[l]] + delta * (Y - V[[l]] %*% eta_new - e_new[[l]])
+    }
+    
+    # Process for multiplier w
+    w_new <- w_old + delta * (theta_new - eta_new)
+    
+    # Update iteration error
+    iter_error[iter, "eta"] <- Matrix::norm(eta_old - eta_new, type = "F")
+    iter_error[iter, "theta"] <- Matrix::norm(theta_old - theta_new, type = "F")
+    e_diff <- mapply(FUN = function(old, new) old - new, e_old, e_new, SIMPLIFY = FALSE)  # sum of frobenius norm
+    iter_error[iter, "e"] <- lapply(e_diff, FUN = function(x) Matrix::norm(x, type = "F")) %>% Reduce("+", .)
+    u_diff <- mapply(FUN = function(old, new) old - new, u_old, u_new, SIMPLIFY = FALSE)
+    iter_error[iter, "u"] <- lapply(u_diff, FUN = function(x) Matrix::norm(x, type = "F")) %>% Reduce("+", .)
+    iter_error[iter, "w"] <- Matrix::norm(w_old - w_new, type = "F")
+    
+    if(sum(iter_error[iter, ]) < tol_error) break
+    
+    eta_old <- eta_new
+    theta_old <- theta_new
+    e_old <- e_new
+    u_old <- u_new
+    w_old <- w_new
+  }
+  
+  return(list(eta = eta_new, 
+              theta = theta_new, 
+              e = e_new, 
+              u = u_new, 
+              w = w_new, 
+              iter_error = iter_error, 
+              params = lambda))
+}
