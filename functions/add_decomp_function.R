@@ -195,7 +195,7 @@ add_decomp_BIC <- function(X, Y, V, Phi, theta_0, Z_0, tau_seq, tau_seq_real, la
   for(lamb1_idx in 1:length(lamb1_seq)) {
     simulation[[lamb1_idx]] <- list()
     for(lamb2_idx in 1:length(lamb2_seq)) {
-      simulation[[lamb1_idx]][[lamb2_idx]] <- add_decomp(delta = 1, lambda_1 = lamb1_seq[lamb1_idx], 
+      simulation[[lamb1_idx]][[lamb2_idx]] <- add_decomp_r(delta = 1, lambda_1 = lamb1_seq[lamb1_idx], 
                                                          lambda_2 = lamb2_seq[lamb2_idx], tol_error = 0.1^5, 
                                                          max_iter = max_iter, X = X, Y = Y, V = V, Phi = Phi, 
                                                          theta_0, Z_0, tau_seq = tau_seq, weight = TRUE)
