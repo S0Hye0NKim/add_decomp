@@ -108,7 +108,8 @@ add_decomp_r <- function(delta, lambda_1, lambda_2, tol_error, max_iter, X, Y, V
               e = e_new, 
               u = u_new, 
               w = w_new, 
-              iter_error = iter_error))
+              iter_error = iter_error, 
+              params = c(lambda_1, lambda_2) %>% `names<-`(value = c("lambda_1", "lambda_2"))))
 }
 
 # Calculate TP, TN, FP, FN of sparse matrix
