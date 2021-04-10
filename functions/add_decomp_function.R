@@ -443,7 +443,7 @@ SP_model_r <- function(delta, lambda, tol_error, max_iter, X, Y, V, Phi,
   eta_old <- theta_0
   theta_old <- eta_old
   e_old <- list()
-  for(l in 1:b) {e_old[[l]] <- Y - Z_old - V[[l]] %*% eta_old}
+  for(l in 1:b) {e_old[[l]] <- Y - V[[l]] %*% eta_old}
   u_old <- list()
   for(l in 1:b) {u_old[[l]] <- matrix(0, nrow = n, ncol = m)}
   w_old <- matrix(0, nrow = (p+1)*K, ncol = m)
