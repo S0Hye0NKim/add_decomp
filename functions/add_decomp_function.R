@@ -282,7 +282,7 @@ LR_model_BIC <- function(X, Y, Z_0, tau_seq, tau_seq_real, lamb_seq, max_iter) {
   r_X <- rankMatrix(X)
   names(BIC) <- lamb_seq
   BIC_data <- BIC %>% bind_rows(.id = "lambda") %>%
-    mutate(term = (r_hat * min(r_X, m))/(2*n*m), 
+    mutate(term = (r_hat * max(r_X, m))/(2*n*m), 
            BIC_log_sum = log_Q + log(p+m)*term, 
            BIC_log_p = log_Q + log(p)*term, 
            BIC_log_n = log_Q + log(n)*term, 
