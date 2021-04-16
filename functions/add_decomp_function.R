@@ -184,10 +184,11 @@ cal_cl_sum <- function(e, tau_seq) {
 
 # parameter selection via BIC
 add_decomp_BIC <- function(X, Y, V, Phi, theta_0, Z_0, tau_seq, tau_seq_real, lamb1_seq, lamb2_seq, 
-                     max_iter) {
+                           max_iter) {
   m <- ncol(Y)
   p <- ncol(X) - 1
   K <- ncol(V[[1]])/(p+1)
+  n <- nrow(X)
   idx_tau <- tau_seq %in% tau_seq_real
   
   # iteration for lamb1_seq and lamb2_seq
@@ -196,9 +197,9 @@ add_decomp_BIC <- function(X, Y, V, Phi, theta_0, Z_0, tau_seq, tau_seq_real, la
     simulation[[lamb1_idx]] <- list()
     for(lamb2_idx in 1:length(lamb2_seq)) {
       simulation[[lamb1_idx]][[lamb2_idx]] <- add_decomp_r(delta = 1, lambda_1 = lamb1_seq[lamb1_idx], 
-                                                         lambda_2 = lamb2_seq[lamb2_idx], tol_error = 0.1^5, 
-                                                         max_iter = max_iter, X = X, Y = Y, V = V, Phi = Phi, 
-                                                         theta_0, Z_0, tau_seq = tau_seq, weight = TRUE)
+                                                           lambda_2 = lamb2_seq[lamb2_idx], tol_error = 0.1^5, 
+                                                           max_iter = max_iter, X = X, Y = Y, V = V, Phi = Phi, 
+                                                           theta_0, Z_0, tau_seq = tau_seq, weight = TRUE)
     }
   }
   
@@ -226,29 +227,15 @@ add_decomp_BIC <- function(X, Y, V, Phi, theta_0, Z_0, tau_seq, tau_seq_real, la
   }
   
   r_X <- rankMatrix(X)
-  BIC_data <- lapply(BIC, FUN = function(x) `names<-`(x, value = lamb2_seq) %>% 
-                       bind_rows(.id = "lambda_2")) %>%
+  params_table <- 
+    lapply(BIC, FUN = function(x) `names<-`(x, value = lamb2_seq) %>% 
+             bind_rows(.id = "lambda_2")) %>%
     `names<-`(value = lamb1_seq) %>%
     bind_rows(.id = "lambda_1") %>%
-    mutate(term = (r_hat * max(r_X, m) + K * S_hat)/(2*n*m), 
-           BIC_log_sum = log_Q + log(p+m)*term, 
-           BIC_log_p = log_Q + log(p)*term, 
-           BIC_log_n = log_Q + log(n)*term, 
-           BIC_llog_p = log_Q + log(log(p))*term,
-           BIC_llog_n = log_Q + log(log(n))*term) %>%
-    group_by(lambda_1, lambda_2) %>%
-    select_at(vars(starts_with("BIC"))) %>%
-    ungroup()
+    mutate(LR_part = r_hat * max(r_X, m) / (2*n*m), 
+           SP_part = K * S_hat / (2*n*m))
   
-  BIC_val_min <- apply(select_at(BIC_data, vars(starts_with("BIC"))), 2, min) %>%
-    `names<-`(value = c("log_sum", "log_p", "log_n", "llog_p", "llog_n"))
-  
-  min_BIC <- filter(BIC_data, BIC_log_sum == BIC_val_min["log_sum"]| BIC_log_p == BIC_val_min["log_p"] |
-                      BIC_log_n == BIC_val_min["log_n"] | BIC_llog_p == BIC_val_min["llog_p"] | 
-                      BIC_llog_n == BIC_val_min["llog_n"])
-  
-  output <- list(min_BIC = min_BIC, 
-                 BIC_data = BIC_data, 
+  output <- list(table = params_table, 
                  simulation = simulation)
   
   
