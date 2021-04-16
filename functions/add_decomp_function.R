@@ -230,7 +230,7 @@ add_decomp_BIC <- function(X, Y, V, Phi, theta_0, Z_0, tau_seq, tau_seq_real, la
                        bind_rows(.id = "lambda_2")) %>%
     `names<-`(value = lamb1_seq) %>%
     bind_rows(.id = "lambda_1") %>%
-    mutate(term = (r_hat * min(r_X, m) + K * S_hat)/(2*n*m), 
+    mutate(term = (r_hat * max(r_X, m) + K * S_hat)/(2*n*m), 
            BIC_log_sum = log_Q + log(p+m)*term, 
            BIC_log_p = log_Q + log(p)*term, 
            BIC_log_n = log_Q + log(n)*term, 
