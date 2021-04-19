@@ -66,7 +66,7 @@ for(simul in 1:simul_times) {
   
   LR_mat <- matrix(rnorm((p+1)*m, mean = 0, sd = 1), ncol = m) # make low rank matrix using SVD
   SVD <- svd(LR_mat)
-  D_mat <- diag(runif(num_rank, min = 2.5, max = 3) %>% sort(decreasing = TRUE), nrow = length(SVD$d))
+  D_mat <- diag(runif(num_rank, min = 3, max = 5) %>% sort(decreasing = TRUE), nrow = length(SVD$d))
   idx <- (num_rank+1):min(m, p)
   D_mat[idx, idx] <- 0
   LR_mat_list[[simul]] <- SVD$u %*% D_mat %*% t(SVD$v)
@@ -80,6 +80,7 @@ for(simul in 1:simul_times) {
 
 Y_list <- mapply(FUN = function(X, LR, SP, eps) X %*% (LR + SP) + eps, 
                  X_list, LR_mat_list, sp_mat_list, eps_list, SIMPLIFY = FALSE)
+
 
 
 ### Calculate kronecker product
@@ -142,14 +143,14 @@ simul_low_add_decomp <- foreach(simul = 1:simul_times, .noexport = "add_decomp")
                            X = X, Y = Y, V = V, Phi = Phi, 
                            theta_0 = theta_init, Z_0 = X%*%alpha_init, tau_seq = tau_seq, weight = FALSE)
   
-  lamb1_seq <- c( seq(20, 35, length.out = 10))
-  lamb2_seq <- c(seq(30, 100, length.out = 10))
+  lamb1_seq <- c( seq(5, 25, length.out = 10))
+  lamb2_seq <- c(seq(200, 300, length.out = 10))
   BIC_simul <- add_decomp_BIC(X, Y, V, Phi, theta_0 = init_val$theta, Z_0 = init_val$Z, tau_seq, tau_seq_real, 
                               lamb1_seq = lamb1_seq, lamb2_seq = lamb2_seq, max_iter = 50)
   
   BIC_params <- BIC_simul$table %>%
-    mutate(LR =  log(n) * LR_part, 
-           SP = log(p)* log(log(n)) * SP_part, 
+    mutate(LR =  log(p) * LR_part, 
+           SP = log(n)*log(p) * SP_part, 
            BIC = log_Q + LR + SP) %>%
     arrange(BIC) %>%
     head(1)
@@ -186,8 +187,8 @@ simul_low_LR_model <- foreach(simul = 1:simul_times, .noexport = "add_decomp") %
   }
   first_init_LR <- ridge_coef
   
-  init_val_LR <- LR_model_r(delta = 1, lambda = 20, tol_error = 0.1^5, max_iter = 50, 
-                          X = X, Y = Y, Z_0 = X %*% first_init_LR, tau_seq = tau_seq, weight = FALSE)
+  init_val_LR <- LR_model_r(delta = 1, lambda = 30, tol_error = 0.1^5, max_iter = 50, 
+                            X = X, Y = Y, Z_0 = X %*% first_init_LR, tau_seq = tau_seq, weight = FALSE)
   
   lamb_seq <- seq(0.1^20, 0.1, length.out = 25)
   BIC_simul <- LR_model_BIC(X, Y, Z_0 = init_val_LR$Z, tau_seq, tau_seq_real, lamb_seq, max_iter = 50)
@@ -259,7 +260,8 @@ stopCluster(cl)
 ## Save Data ##
 ###############
 
-save(simul_low_add_decomp, simul_low_LR_model, simul_low_SP_model, LR_mat_list, sp_mat_list, Phi, tau_seq, file = "ksh_simul_mixture_error_low.RData")
+save(simul_low_add_decomp, simul_low_LR_model, simul_low_SP_model, 
+     LR_mat_list, sp_mat_list, Phi, tau_seq, tau_seq_real, X_list, file = "ksh_simul_mixture_error_low.RData")
 
 
 
