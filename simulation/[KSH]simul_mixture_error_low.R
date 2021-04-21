@@ -149,11 +149,11 @@ simul_low_add_decomp <- foreach(simul = 1:simul_times, .noexport = "add_decomp")
                               lamb1_seq = lamb1_seq, lamb2_seq = lamb2_seq, max_iter = 50)
   
   BIC_params <- BIC_simul$table %>%
-    mutate(LR =  log(p) * LR_part, 
-           SP = log(n)*log(p) * SP_part, 
+    mutate(LR = log(n)*log(log(p)) * LR_part, 
+           SP = log(n)*log(log(p))  *SP_part, 
            BIC = log_Q + LR + SP) %>%
     arrange(BIC) %>%
-    head(1)
+    head(1) 
   
   result <- BIC_simul$simulation[[which(lamb1_seq == BIC_params$lambda_1)]][[which(lamb2_seq == BIC_params$lambda_2)]]
   
