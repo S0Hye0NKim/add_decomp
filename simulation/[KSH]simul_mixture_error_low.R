@@ -22,7 +22,7 @@ source("https://raw.githubusercontent.com/S0Hye0NKim/add_decomp/master/functions
 #################
 
 ## Generate data
-set.seed(0)
+set.seed(1)
 n <- 400
 m <- 10
 p <- 100
@@ -31,45 +31,34 @@ num_rank <- 5
 num_rank_X <- 30
 simul_times <- 100
 
-sigma_mat <- matrix(nrow = num_rank_X, ncol = num_rank_X)
-for(j in 1:num_rank_X) {
-  for(k in 1:num_rank_X) {
+sigma_mat <- matrix(nrow = p, ncol = p)
+for(j in 1:p) {
+  for(k in 1:p) {
     sigma_mat[j, k] <- 0.5^(abs(j-k))
   }
 }
 
+# sparse matrix
+col_ind <- sample(1:m, size = m, replace = FALSE)
+row_ind <- sample(1:(p+1), size = m)
+sp_mat <- matrix(0, nrow = p+1, ncol = m)
+for(i in 1:m) {
+  sp_mat[row_ind[i], col_ind[i]] <- rnorm(1, mean = 5, sd = 0.1)
+}
+
+# low rank matrix
+L1 <- matrix(rnorm((p+1)*num_rank, mean = 0, sd = 0.3), nrow = p+1)
+L2 <- matrix(rnorm(m*num_rank, mean = 0, sd = 0.3), nrow = m)
+LR_mat <- L1 %*% t(L2)
+
 X_list <- list()
-LR_mat_list <- list()
-sp_mat_list <- list()
 eps_list <- list()
 
 for(simul in 1:simul_times) {
-  X <- matrix(rnorm(n*num_rank_X, mean = 0, sd = 1), nrow = n)
-  X <- X %*% expm::sqrtm(sigma_mat)
-  X <- cbind(X, X, X, X)[, 1:100]
-  for(j in (num_rank_X+1):(2*num_rank_X)) {
-    X[, j] <- X[, j-30] + X[, j-29]
-    X[, (j+30)] <- 2*X[, j-30] + X[, j-28]
-  }
-  for(j in 91:100) {
-    X[, j] <- X[, 3*(j-91)+1] + X[, 3*(j-91)+2] + X[, 3*(j-91)+3]
-  }
-  X_list[[simul]] <- X %>% cbind(rep(1, n), .)
-  
-  col_ind <- sample(1:m, size = m, replace = FALSE)
-  row_ind <- sample(2:(p+1), size = m)
-  sp_mat_list[[simul]] <- matrix(0, nrow = p+1, ncol = m)
-  for(i in 1:m) {
-    sp_mat_list[[simul]][row_ind[i], col_ind[i]] <- rnorm(1, mean = 5, sd = 0.1)
-  }
-  sp_mat_list[[simul]][1, ] <- rnorm(m, mean = 5, sd = 0.1)
-  
-  LR_mat <- matrix(rnorm((p+1)*m, mean = 0, sd = 1), ncol = m) # make low rank matrix using SVD
-  SVD <- svd(LR_mat)
-  D_mat <- diag(runif(num_rank, min = 3, max = 5) %>% sort(decreasing = TRUE), nrow = length(SVD$d))
-  idx <- (num_rank+1):min(m, p)
-  D_mat[idx, idx] <- 0
-  LR_mat_list[[simul]] <- SVD$u %*% D_mat %*% t(SVD$v)
+  X1 <- matrix(rnorm(n*num_rank_X, mean = 0, sd = 1), nrow = n)
+  X2 <- matrix(rnorm(p*num_rank_X, mean = 0, sd = 1), nrow = p)
+  X <- X1 %*% t(X2) 
+  X_list[[simul]] <- X %*% expm::sqrtm(sigma_mat) %>% cbind(rep(1, n), .)
   
   components <- sample(1:2, size = n*m, replace = TRUE)
   mus <- c(0, 5)
@@ -79,7 +68,7 @@ for(simul in 1:simul_times) {
 }
 
 Y_list <- mapply(FUN = function(X, LR, SP, eps) X %*% (LR + SP) + eps, 
-                 X_list, LR_mat_list, sp_mat_list, eps_list, SIMPLIFY = FALSE)
+                 X_list, list(LR_mat), list(sp_mat), eps_list, SIMPLIFY = FALSE)
 
 
 
@@ -100,7 +89,7 @@ for(simul in 1:simul_times) {
 ## 1-1. Simulation - add_decomp ##
 ##################################
 
-cl <- makeCluster(15) #not to overload your computer
+cl <- makeCluster(10) #not to overload your computer
 registerDoParallel(cl) # Ready to parallel
 simul_low_add_decomp <- foreach(simul = 1:simul_times, .noexport = "add_decomp") %dopar% {
   library(dplyr)
@@ -139,21 +128,21 @@ simul_low_add_decomp <- foreach(simul = 1:simul_times, .noexport = "add_decomp")
   }
   alpha_init <- ridge_coef
   
-  init_val <- add_decomp_r(delta = 1, lambda_1 = 1.2, lambda_2 = 5, tol_error = 0.1^5, max_iter = 50,
+  init_val <- add_decomp_r(delta = 1, lambda_1 = 0.06, lambda_2 = 0.1, tol_error = 0.1^5, max_iter = 50,
                            X = X, Y = Y, V = V, Phi = Phi, 
                            theta_0 = theta_init, Z_0 = X%*%alpha_init, tau_seq = tau_seq, weight = FALSE)
   
-  lamb1_seq <- c( seq(5, 25, length.out = 10))
-  lamb2_seq <- c(seq(200, 300, length.out = 10))
+  lamb1_seq <- c( seq(0.001, 0.15, length.out = 10))
+  lamb2_seq <- c(seq(100, 300, length.out = 10))
   BIC_simul <- add_decomp_BIC(X, Y, V, Phi, theta_0 = init_val$theta, Z_0 = init_val$Z, tau_seq, tau_seq_real, 
                               lamb1_seq = lamb1_seq, lamb2_seq = lamb2_seq, max_iter = 50)
   
   BIC_params <- BIC_simul$table %>%
-    mutate(LR = log(n)*log(log(p)) * LR_part, 
-           SP = log(n)*log(log(p))  *SP_part, 
+    mutate(LR = log(log(log(p))) * LR_part, 
+           SP = log(n)*log(p) * SP_part, 
            BIC = log_Q + LR + SP) %>%
     arrange(BIC) %>%
-    head(1) 
+    head(1)
   
   result <- BIC_simul$simulation[[which(lamb1_seq == BIC_params$lambda_1)]][[which(lamb2_seq == BIC_params$lambda_2)]]
   
@@ -166,7 +155,7 @@ stopCluster(cl)
 ## 1-2. Simulation - LR_model ##
 ################################
 
-cl <- makeCluster(15) #not to overload your computer
+cl <- makeCluster(10) #not to overload your computer
 registerDoParallel(cl) # Ready to parallel
 simul_low_LR_model <- foreach(simul = 1:simul_times, .noexport = "add_decomp") %dopar% {
   library(dplyr)
@@ -187,7 +176,7 @@ simul_low_LR_model <- foreach(simul = 1:simul_times, .noexport = "add_decomp") %
   }
   first_init_LR <- ridge_coef
   
-  init_val_LR <- LR_model_r(delta = 1, lambda = 30, tol_error = 0.1^5, max_iter = 50, 
+  init_val_LR <- LR_model_r(delta = 1, lambda = 50, tol_error = 0.1^5, max_iter = 50, 
                             X = X, Y = Y, Z_0 = X %*% first_init_LR, tau_seq = tau_seq, weight = FALSE)
   
   lamb_seq <- seq(0.1^20, 0.1, length.out = 25)
@@ -209,7 +198,7 @@ stopCluster(cl)
 ## 1-3. Simulation - SP_model ##
 ################################
 
-cl <- makeCluster(15) #not to overload your computer
+cl <- makeCluster(10) #not to overload your computer
 registerDoParallel(cl) # Ready to parallel
 simul_low_SP_model <- foreach(simul = 1:simul_times, .noexport = "add_decomp") %dopar% {
   library(dplyr)
@@ -240,7 +229,7 @@ simul_low_SP_model <- foreach(simul = 1:simul_times, .noexport = "add_decomp") %
   init_val_SP <- SP_model_r(delta = 1, lambda = 0.001, tol_error = 0.1^5, max_iter = 50, 
                             X = X, Y = Y, V = V, Phi = Phi, theta_0 = first_init_SP, tau_seq = tau_seq, weight = FALSE)
   
-  lamb_seq <- seq(30, 100, length.out = 10)
+  lamb_seq <- seq(1, 15, length.out = 20)
   BIC_simul <- SP_model_BIC(X, Y, V, Phi, theta_0 = init_val_SP$theta, 
                             tau_seq, tau_seq_real, lamb_seq, max_iter = 50)
   
@@ -261,7 +250,7 @@ stopCluster(cl)
 ###############
 
 save(simul_low_add_decomp, simul_low_LR_model, simul_low_SP_model, 
-     LR_mat_list, sp_mat_list, Phi, tau_seq, tau_seq_real, X_list, file = "ksh_simul_mixture_error_low.RData")
+     LR_mat, sp_mat, Phi, tau_seq, tau_seq_real, X_list, file = "ksh_simul_mixture_error_low.RData")
 
 
 
