@@ -4,6 +4,12 @@ add_decomp_r <- function(delta, lambda_1, lambda_2, tol_error, max_iter, X, Y, V
   # lambda_1 = low rank penalty
   # lambda_2 = sparse penalty
   
+  n <- nrow(X)
+  p <- ncol(X) - 1
+  K <- ncol(Phi)
+  b <- nrow(Phi)
+  m <- ncol(Y)
+  
   # initial value
   eta_old <- theta_0
   theta_old <- eta_old
