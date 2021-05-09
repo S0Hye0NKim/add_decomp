@@ -433,6 +433,11 @@ LR_model_r <- function(delta, lambda, tol_error, max_iter, X, Y, Z_0, tau_seq, w
 # Sparse model
 SP_model_r <- function(delta, lambda, tol_error, max_iter, X, Y, V, Phi, 
                        theta_0, tau_seq, weight = TRUE) {
+  n <- nrow(X)
+  m <- ncol(Y)
+  p <- ncol(X) - 1
+  b <- length(tau_seq)
+  
   # initial value
   eta_old <- theta_0
   theta_old <- eta_old
