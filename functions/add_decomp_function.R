@@ -249,9 +249,10 @@ add_decomp_BIC <- function(X, Y, V, Phi, theta_0, Z_0, tau_seq, tau_seq_real, la
 }
 
 # parameter selection via BIC
-LR_model_BIC <- function(X, Y, Z_0, tau_seq, tau_seq_real, lamb_seq, max_iter) {
+LR_model_BIC <- function(X, Y, Z_0, tau_seq, tau_seq_real, lamb_seq, max_iter, r_X) {
   m <- ncol(Y)
   p <- ncol(X) - 1
+  n <- nrow(X)
   idx_tau <- tau_seq %in% tau_seq_real
   
   # iteration for lamb_seq
@@ -271,8 +272,7 @@ LR_model_BIC <- function(X, Y, Z_0, tau_seq, tau_seq_real, lamb_seq, max_iter) {
       Reduce("+", .) %>% as.vector %>% sum
     BIC[[i]] <- data.frame(log_Q = log(check_loss_err), r_hat = rankMatrix(result$Z)[1])
   }
-  
-  r_X <- rankMatrix(X)
+
   names(BIC) <- lamb_seq
   BIC_data <- BIC %>% bind_rows(.id = "lambda") %>%
     mutate(term = (r_hat * max(r_X, m))/(2*n*m), 
@@ -304,6 +304,7 @@ SP_model_BIC <- function(X, Y, V, Phi, theta_0, tau_seq, tau_seq_real, lamb_seq,
   m <- ncol(Y)
   p <- ncol(X) - 1
   K <- ncol(V[[1]])/(p+1)
+  n <- nrow(X)
   idx_tau <- tau_seq %in% tau_seq_real
   
   # iteration for lamb1_seq and lamb2_seq
