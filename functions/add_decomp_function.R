@@ -234,8 +234,9 @@ add_decomp_BIC <- function(X, Y, V, Phi, theta_0, Z_0, tau_seq, tau_seq_real, de
         group_by(row, col) %>%
         summarise(zero = n(), .groups = "keep") %>%
         filter(zero == sum(idx_tau))
-      S_hat <- nrow(zero_idx_est)
-      num_nz_intercept <- zero_idx_est %>% filter(row == 1) %>% nrow
+      num_nz <- nrow(zero_idx_est)
+      S_hat <- (gamma_tau_hat[[1]] %>% dim %>% prod) - num_nz 
+      num_nz_intercept <- m - (zero_idx_est %>% filter(row == 1) %>% nrow)
       
       BIC[[i]][[j]] <- data.frame(log_Q = log(check_loss_err), 
                                   r_hat = rankMatrix(result$Z)[1], 
@@ -257,6 +258,7 @@ add_decomp_BIC <- function(X, Y, V, Phi, theta_0, Z_0, tau_seq, tau_seq_real, de
   
   return(output)
 }
+
 
 # parameter selection via BIC
 LR_model_BIC <- function(X, Y, Z_0, tau_seq, tau_seq_real, delta, lamb_seq, max_iter, r_X) {
