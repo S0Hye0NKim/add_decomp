@@ -47,13 +47,12 @@ add_decomp_r <- function(delta, lambda_1, lambda_2, tol_error, max_iter, X, Y, V
     for (g in 1:m) {
       for(j in 1:(p+1)) {
         theta_tilde <- theta_0[(K*(j-1) +1):(j*K), g]
-        weight_theta <- ifelse(weight == TRUE, (theta_tilde^2) %>% sum %>% sqrt 
-                               %>% scad_deriv(., lambda = lambda_2), 1)  # weight = scad_deriv(theta_norm)
+        norm_theta_tilde <- ifelse(weight == TRUE, (theta_tilde^2) %>% sum %>% sqrt, 1)  # weight = 1/norm_theta_tilde
         eta_j_g <- eta_new[(K*(j-1) +1):(j*K), g]
         w_j_g <- w_old[(K*(j-1) +1):(j*K), g]
         r_j_g <- eta_j_g - (w_j_g/delta)
         norm_r_j_g <- (r_j_g^2) %>% sum %>% sqrt
-        value <- 1 - (lambda_2/(delta *norm_r_j_g)) * weight_theta
+        value <- 1 - (lambda_2/(delta *norm_r_j_g*norm_theta_tilde))
         if(value >= 0) {
           theta_new[(K*(j-1) +1):(j*K), g] <- value * r_j_g
         } else {theta_new[(K*(j-1) +1):(j*K), g] <- 0}
@@ -69,9 +68,8 @@ add_decomp_r <- function(delta, lambda_1, lambda_2, tol_error, max_iter, X, Y, V
     SVD <- svd(obj)
     if(weight == TRUE) {
       sing_val_Z_0 <- svd(Z_0) %>% .$d
-      weight_Z <- scad_deriv(sing_val_Z_0, lambda = lambda_1)
-    } else {weight_Z <- rep(1, length(svd(Z_0) %>% .$d))}  # weight = 1/sing_val_Z_0
-    new_singular <- sapply(SVD$d - (lambda_1*weight_Z)/(delta*b), FUN = function(x) max(x, 0))
+    } else {sing_val_Z_0 <- rep(1, length(svd(Z_0) %>% .$d))}  # weight = 1/sing_val_Z_0
+    new_singular <- sapply(SVD$d - lambda_1/(delta*b*sing_val_Z_0), FUN = function(x) max(x, 0))
     Z_new <- SVD$u %*% diag(new_singular) %*% t(SVD$v)
     
     # Process for e
@@ -231,12 +229,18 @@ add_decomp_BIC <- function(X, Y, V, Phi, theta_0, Z_0, tau_seq, tau_seq_real, de
                                tau = as.list(tau_seq_real), SIMPLIFY = FALSE) %>%
         lapply(FUN = function(x) sum(x)) %>% unlist %>% sum
       gamma_tau_hat <- est_gamma(Phi[idx_tau, ], result$theta)
-      S_hat <- check_sp_table(true = matrix(0, nrow = (p+1), ncol = m), 
-                              est = gamma_tau_hat, table = TRUE, tol = 0.1^5, tau_seq = tau_seq_real) %>%
-        .$Est_Positive %>% sum
+      zero_idx_est <- lapply(gamma_tau_hat, FUN = function(x) which(abs(x) < 0.1^5, arr.ind = TRUE) %>% as_tibble) %>%
+        bind_rows(.id = "tau") %>%
+        group_by(row, col) %>%
+        summarise(zero = n(), .groups = "keep") %>%
+        filter(zero == sum(idx_tau))
+      S_hat <- nrow(zero_idx_est)
+      num_nz_intercept <- zero_idx_est %>% filter(row == 1) %>% nrow
+      
       BIC[[i]][[j]] <- data.frame(log_Q = log(check_loss_err), 
                                   r_hat = rankMatrix(result$Z)[1], 
-                                  S_hat = S_hat)
+                                  S_hat = S_hat, 
+                                  num_nz_intercept = num_nz_intercept)
     }
   }
   
@@ -245,9 +249,7 @@ add_decomp_BIC <- function(X, Y, V, Phi, theta_0, Z_0, tau_seq, tau_seq_real, de
     lapply(BIC, FUN = function(x) `names<-`(x, value = lamb2_seq) %>% 
              bind_rows(.id = "lambda_2")) %>%
     `names<-`(value = lamb1_seq) %>%
-    bind_rows(.id = "lambda_1") %>%
-    mutate(LR_part = r_hat * max(r_X, m) / (2*n*m), 
-           SP_part = K * S_hat / (2*n*m))
+    bind_rows(.id = "lambda_1") 
   
   output <- list(table = params_table, 
                  simulation = simulation)
