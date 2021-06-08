@@ -19,6 +19,7 @@ library(fda)
 library(glmnet)
 library(foreach)
 library(doParallel)
+library(gplots)
 
 source("https://raw.githubusercontent.com/S0Hye0NKim/add_decomp/master/functions/add_decomp_function.R")
 sourceCpp("[KSH]add_decomp_function.cpp")
@@ -51,6 +52,34 @@ data.frame(Y_sd) %>%
 Y <- Y[, -"Panobinostat"] 
 m <- ncol(Y)
 ```
+
+```{r}
+Y <- fread("ksh_resp_mat.csv")[, -1]
+m <- ncol(Y)
+trt_nm <- readLines("ksh_trt_nm.txt", encoding = "UTF-8") %>%
+  str_split(pattern = ",") %>%
+  sapply(FUN = function(x) str_remove_all(x, pattern = "'") %>% str_trim) %>%
+  unlist()
+trt_nm <- trt_nm[trt_nm != ""]
+names(Y) <- trt_nm
+
+Y_sd <- Y[, lapply(.SD, sd)] %>% as.matrix %>% t()
+data.frame(Y_sd) %>%
+  mutate(group = rownames(.)) %>%
+  dplyr::select(group, Y_sd) %>%
+  arrange(Y_sd) %>%
+  mutate(color = ifelse(Y_sd == min(Y_sd), "red", "blue")) %>%
+  ggplot() +
+  geom_bar(aes(x = reorder(group, -Y_sd), y = Y_sd, fill = color), stat = "identity") +
+  coord_flip() +
+  scale_fill_manual(values = c("blue", "red")) +
+  labs(x = "drugs", 
+       y = "standard deviation") +
+  guides(fill = FALSE) +
+  ggtitle(label = "Filtering response variables")
+```
+
+
 
 Panobinostat 의 sd = 0.08 -> 제거
 
@@ -102,7 +131,7 @@ gene_ex <- colnames(X)
 
 
 ```{r}
-K <- 2
+K <- 5
 b <- 15
 tau_seq <- seq(from = 0.35, to = 0.65, length.out = b)
 idx_tau <- idx_tau <- (tau_seq >= "0.4" & tau_seq <= "0.6")
@@ -145,33 +174,6 @@ theta_init <- matrix(nrow = (p+1)*K, ncol = m)
 ```
 
 
-
-```{r}
-library(ggplot2)
-data.frame(col = rep(1:m, each = (p+1)), 
-           row = rep(1:(p+1), m),
-           value = as.vector(lasso_coef)) %>%
-  mutate(nonzero = ifelse(abs(value) < 0.1^5, 0, 1) %>% as.character) %>%
-  ggplot(aes(x = col, y = -row, fill = nonzero)) +
-  geom_tile(color = "grey") +
-  scale_fill_manual(values = c("white", "black"), name = "entry", label = c("zero", "non-zero")) + 
-  theme_bw() +
-  theme(axis.line = element_blank(),
-    panel.grid.major = element_blank(),
-    panel.grid.minor = element_blank(),
-    panel.border = element_blank(),
-    panel.background = element_blank(), 
-    axis.title.x = element_blank(), 
-    axis.text.x = element_blank(), 
-    axis.ticks.x = element_blank(), 
-    axis.title.y = element_blank(), 
-    axis.text.y = element_blank(), 
-    axis.ticks.y = element_blank()) +
-  ggtitle("lasso_coef heatmap") 
-```
-
-
-
 # 1. Initial value
 
 ```{r}
@@ -188,36 +190,25 @@ init_val <- add_decomp_r(delta = 1, lambda_1 = 0.01, lambda_2 = 0.001, tol_error
 ```{r}
 gamma_tau_hat <- est_gamma(Phi[idx_tau, ], init_val$theta)
 
-zero_idx_est <- lapply(gamma_tau_hat, FUN = function(x) which(abs(x) < 0.1^5, arr.ind = TRUE) %>% as_tibble) %>%
-    bind_rows (.id = "tau") %>%
-    group_by(row, col) %>%
-    summarise(zero = n(), .groups = "keep") %>%
-    filter(zero == length(gamma_tau_hat))
-
-Neg <- nrow(zero_idx_est)
-Pos <- prod(dim(gamma_tau_hat[[1]])) - Neg
-
-data.frame("Positive"=Pos, "Negative" = Neg)
-
-
+check_sp_table(true = matrix(0, nrow = (p+1), ncol = m), 
+               est = gamma_tau_hat, tau_seq = tau_seq_real, table = TRUE)
 ```
 
 
 # 2. BIC
 
 ```{r}
-log_lamb1 <- c( seq(0.9, 1.5, length.out = 10))
+log_lamb1 <- c( seq(0.9, 4, length.out = 20))
 lamb1_seq <- exp(log_lamb1)
 
-#log_lamb2 <- c(seq(1, 2, length.out = 10))
-log_lamb2 <- c(seq(1.2, 3.2, length.out = 10))
+log_lamb2 <- c(seq(1, 2.2, length.out = 20))
 lamb2_seq <- exp(log_lamb2)
 
 BIC_table <- list()
 
 for(idx in 1:length(lamb1_seq)) {
   lamb1 <- lamb1_seq[idx]
-  cl <- makeCluster(11) #not to overload your computer
+  cl <- makeCluster(20) #not to overload your computer
   registerDoParallel(cl) # Ready to parallel
   
   temp_BIC <- foreach(lamb2 = lamb2_seq, .noexport = "add_decomp") %dopar% {
@@ -238,93 +229,38 @@ for(idx in 1:length(lamb1_seq)) {
 
 BIC_table %>% lapply(FUN = function(x) bind_rows(x)) %>%
   bind_rows() %>%
-  mutate(LR_part = r_hat * max(1, m) / (2*n*m),  
-         LR = log(n) * LR_part, 
-         SP = log(p)*log(log(n)) * SP_part, 
+  mutate(LR_part = r_hat * max(1, m) / (2*n*m),
+         S_hat_net = S_hat - num_nz_intercept,
+         LR = log(p) * log(log(n)) * LR_part, 
+         SP = log(p) * log(log(n)) * K * S_hat_net / (2*n*m),
          BIC = log_Q + LR + SP) %>%
-  arrange(BIC) %>%
-  head(6)
-
-```
-
-```{r}
-load("C:/Users/Sohyeon Kim/add_decomp/BIC_table.RData")
-
-BIC_table %>% lapply(FUN = function(x) bind_rows(x)) %>%
-  bind_rows() %>%
-  mutate(LR_part = r_hat * max(1, m) / (2*n*m),  
-         LR = log(n) * LR_part, 
-         SP = log(log(n))*log(p) * SP_part, 
-         BIC = log_Q + LR + SP) %>%
-  arrange(BIC) %>%
+  mutate_all(as.numeric) %>%
+  filter(S_hat_net != 0, lambda_2 < 10) %>%
+  arrange(BIC) %>%  
   head(6)
 
 ```
 
 
 
-```{r}
-BIC_params <- BIC_table %>% lapply(FUN = function(x) bind_rows(x)) %>%
-  bind_rows() %>%
-  mutate(LR_part = r_hat * max(1, m) / (2*n*m),  
-         LR = log(n) * LR_part, 
-         SP = log(p)*log(log(n)) * SP_part, 
-         BIC = log_Q + LR + SP) %>%
-  mutate_all(.funs = as.numeric) %>% 
-  arrange(BIC) %>%
-  head(1)
-```
-
-
-
-```{r}
-data <- BIC_table %>% lapply(FUN = function(x) bind_rows(x)) %>%
-  bind_rows() %>%
-  mutate(LR_part = r_hat * max(1, m) / (2*n*m),  
-         LR = log(n) * LR_part, 
-         SP = log(p)*log(log(n)) * SP_part, 
-         BIC = log_Q + LR + SP) %>%
-  mutate_all(.funs = as.numeric) %>%
-  arrange(BIC)
-
-```
-
-
-```{r}
-x <- data$lambda_1 %>% unique() %>% sort
-y <- data$lambda_2 %>% unique() %>% sort
-z <- matrix(0, nrow = length(x), ncol = length(y))
-
-for(i in 1:length(x))
-{
-  for(j in 1:length(y))
-  {
-
-z[i,j] = filter(data, lambda_1 == x[i], lambda_2 == y[j])$BIC
-  }
-}
-```
-
-
-```{r}
-persp3D(x, y, z,theta=30, phi=0, axes=TRUE,scale=2, box=TRUE, nticks=5, 
-
-        ticktype="detailed", xlab="lambda_1", ylab="lambda_2", zlab="BIC", 
-        main = "K = 2")
-```
-
-
- * LR은 log(p)
- 
- * SP는 log(log(p)) 로 임의로 선택.
-
-
-$$\lambda_1=1, \lambda_2=136.1$$
 
 # 3. Proposed Model
 
 ```{r}
-result <- add_decomp_r(delta = 1, lambda_1 = BIC_params$lambda_1 %>% as.numeric, lambda_2 = BIC_params$lambda_2 %>% as.numeric, tol_error = 0.1^5, max_iter = 50,
+log_lamb1 <- c( seq(0.9, 4, length.out = 20))
+lamb1_seq <- exp(log_lamb1)
+
+log_lamb2 <- c(seq(1, 2.2, length.out = 20))
+lamb2_seq <- exp(log_lamb2)
+
+lambda_1 <- lamb1_seq[8]
+lambda_2 <- lamb2_seq[20]
+```
+
+
+
+```{r}
+result <- add_decomp_r(delta = 1, lambda_1 = lambda_1, lambda_2 = lambda_2, tol_error = 0.1^5, max_iter = 50,
                          X = X, Y = Y, V = V, Phi = Phi, 
                          theta_0 = init_val$theta, Z_0 = init_val$Z, tau_seq = tau_seq, weight = TRUE)
 ```
@@ -333,7 +269,9 @@ result <- add_decomp_r(delta = 1, lambda_1 = BIC_params$lambda_1 %>% as.numeric,
 ## Low-rank matrix
 
 ```{r}
-L_hat <- solve(t(X) %*% X) %*% t(X) %*% result$Z
+X_tilde <- X[, -1]
+
+L_hat <- solve(t(X_tilde) %*% X_tilde) %*% t(X_tilde) %*% result$Z
 L_hat %>% rankMatrix
 ```
 
@@ -344,6 +282,39 @@ sum(sing_val[1:1])/sum(sing_val)
 rankMatrix(result$Z)
 sing_val %>% round(2)
 ```
+
+
+
+```{r}
+colnames(L_hat) <- colnames(Y)
+heatmap.2(L_hat, scale = "none", col = bluered(100), 
+          trace = "none", density.info = "none")
+```
+
+```{r}
+r_hat <- rankMatrix(L_hat)[1]
+L_hat_t <- t(L_hat)
+dist_mat <- dist(L_hat_t, method = "euclidean")
+cluster <- hclust(dist_mat, method = "complete")
+plot(cluster, cex = 0.6)
+rect.hclust(cluster, k = r_hat, border = 2:(1+r_hat))
+```
+
+```{r}
+colnames(result$Z) <- colnames(Y)
+heatmap.2(result$Z, scale = "none", col = bluered(100), 
+          trace = "none", density.info = "none")
+```
+
+```{r}
+r_hat <- rankMatrix(result$Z)[1]
+Z_hat_t <- t(result$Z)
+dist_mat <- dist(Z_hat_t, method = "euclidean")
+cluster <- hclust(dist_mat, method = "complete")
+plot(cluster, cex = 0.6)
+rect.hclust(cluster, k = r_hat, border = 2:(1+r_hat))
+```
+
 
 ## Sparse matrix
 
@@ -395,33 +366,9 @@ data.frame(col = rep(1:m, each = (p+1)),
   ggtitle(expression(Gamma~"("~tau[3]~"=0.5)"))
 ```
 
-```{r}
-data.frame(col = rep(1:m, each = (p)), 
-           row = rep(1:p, m),
-           value = as.vector(gamma_tau_hat[[5]][-1, ])) %>%
-  mutate(value = ifelse(abs(value) < 0.1^5, 0, value)) %>%
-  ggplot(aes(x = col, y = -row, fill = value)) +
-  geom_tile(color = "grey") +
-  scale_fill_gradient2(low = "red",mid = "white", high = "blue") +
-  theme_bw() +
-  theme(axis.line = element_blank(),
-    panel.grid.major = element_blank(),
-    panel.grid.minor = element_blank(),
-    panel.border = element_blank(),
-    panel.background = element_blank(), 
-    axis.title.x = element_blank(), 
-    axis.text.x = element_blank(), 
-    axis.ticks.x = element_blank(), 
-    axis.title.y = element_blank(), 
-    axis.text.y = element_blank(), 
-    axis.ticks.y = element_blank()) +
-  ggtitle(expression(Gamma~"("~tau[3]~"=0.5)"))
-```
-
-
 
 ```{r}
-
+library(ggplot2)
 lapply(gamma_tau_hat, FUN = function(x) data.frame(col = rep(1:m, each = (p+1)),
                                                    row = rep(1:(p+1), m),
                                                    value = as.vector(x))) %>%
@@ -446,8 +393,25 @@ lapply(gamma_tau_hat, FUN = function(x) data.frame(col = rep(1:m, each = (p+1)),
     axis.title.y = element_blank(), 
     axis.text.y = element_blank(), 
     axis.ticks.y = element_blank()) +
-  ggtitle(expression("S("~tau[l]~")"))
+  ggtitle(expression("S("~tau[l]~") in AD model"))
 ```
+
+```{r}
+lapply(gamma_tau_hat, FUN = function(x) data.frame(col = rep(1:m, each = (p+1)),
+                                                   row = rep(1:(p+1), m),
+                                                   value = as.vector(x))) %>%
+  `names<-`(tau_seq_real) %>%
+  bind_rows(.id = "tau") %>%
+  mutate(is_nonzero = ifelse(abs(value) < 0.1^5, 0, 1)) %>%
+  group_by(col, row) %>%
+  summarise(is_nonzero = mean(is_nonzero)) %>%
+  mutate(is_nonzero = ifelse(is_nonzero == 0, 0, 1) %>% as.character) %>%
+  filter(is_nonzero == 1, row != 1) %>%
+  arrange(col) %>%
+  dplyr::select(row, col)
+```
+
+
 
 ## smooth function
 
@@ -463,31 +427,51 @@ gamma_data <- gamma_tau_hat %>%
            data.frame(row = idx_nz_est$row, col = idx_nz_est$col, value = . )) %>%
   `names<-`(value = tau_seq_real) %>%
   bind_rows(.id = "tau") %>%
-  filter(row == 47, col == 2) %>% 
+  filter(row != 1, col == 1) %>% 
   unite(col = index, row, col, sep = ",") %>%
   mutate(index = paste0("(", index, ")"), tau = as.numeric(tau))
 
-spline_int <- as.data.frame(spline(gamma_data$tau, gamma_data$value))
+gamma_data_list <- split(gamma_data, gamma_data$index)
+spline_int <- lapply(gamma_data_list, FUN = function(x) as.data.frame(spline(x$tau, x$value))) %>%
+  bind_rows(.id = "index")
 
 ggplot(gamma_data) +
-  geom_point(aes(x = tau, y = value), size = 3) +
-  geom_line(data = spline_int, aes(x = x, y = y))
+  geom_point(aes(x = tau, y = value, color = index)) +
+  geom_line(data = spline_int, aes(x = x, y = y, group = index, color = index)) +
+  ggtitle(expression("S("~tau[l]~") smooth function"))
 
 ```
+
+
+
 ```{r}
-gamma_data <- gamma_tau_hat %>%
+
+ggplot(gamma_data) +
+  geom_line(aes(x = tau, y = value, group = index, color = index), size = 1.1) +
+  scale_color_discrete(name = "drug", labels = c("AEW541", "PD-0325901", "AZD6244")) +
+  labs(x = expression(tau[l])) +
+  ggtitle(label = "17266th gene")
+```
+
+```{r}
+gamma_tau_hat %>%
   lapply(FUN = function(x) x[idx_nz_est$row, idx_nz_est$col] %>% diag %>%
            data.frame(row = idx_nz_est$row, col = idx_nz_est$col, value = . )) %>%
   `names<-`(value = tau_seq_real) %>%
   bind_rows(.id = "tau") %>%
-  filter(col == 15, row != 1) %>%
-  unite(col = index, row, col, sep = ",") %>%
-  mutate(index = paste0("(", index, ")"), tau = as.numeric(tau))
-
-spline_int <- as.data.frame(spline(gamma_data$tau, gamma_data$value))
-
-ggplot(gamma_data) +
-  geom_line(aes(x = tau, y = value, group = index, color = index))
+  filter(row %in% c(12, 22, 57, 73, 95)) %>%
+  filter(col %in% c(15,18)) %>% 
+  mutate( tau = as.numeric(tau), row = as.factor(row), col = as.factor(col), 
+          row = case_when(row == 12 ~ "17786th gene", 
+                          row == 22 ~ "17184th gene", 
+                          row == 57 ~ "16647th gene", 
+                          row == 73 ~ "17266th gene", 
+                          row == 95 ~ "4828th gene")) %>%
+  ggplot() +
+  geom_line(aes(x = tau, y = value, group = col, color = col), size = 1.1) +
+  facet_wrap(~row) +
+  scale_color_discrete(name = "drug", labels = c("PD-0325901", "AZD6244")) +
+  labs(x = expression(tau[l]))
 ```
 
 
@@ -517,6 +501,157 @@ ggplot(gamma_data) +
 ```
 
 
+# LR
+
+```{r}
+X <- as.matrix(X)
+Y <- as.matrix(Y)
+ridge_coef <- matrix(nrow = p+1, ncol = m)
+  for(g in 1:m) {
+    cv.ridge <- cv.glmnet(x = X[, -1], y = Y[, g], alpha = 0, type.measure = "mae")
+    ridge_model <- glmnet(X[, -1], Y[, g], family = "gaussian", alpha = 0, 
+                          lambda = cv.ridge$lambda.min)
+    ridge_coef[, g] <- c(ridge_model$a0, as.vector(ridge_model$beta))
+  }
+ first_init_LR <- ridge_coef
+  
+ init_val_LR <- LR_model_r(delta = 0.1, lambda = 0.05, tol_error = 0.1^5, max_iter = 50, 
+                          X = X, Y = Y, Z_0 = X %*% first_init_LR, 
+                          tau_seq = tau_seq, weight = FALSE)
+ 
+ log_lamb <- c( seq(1, 10, length.out = 20))
+ lamb_seq <- exp(log_lamb)
+ BIC_simul <- LR_model_BIC(X, Y, Z_0 = init_val_LR$Z, tau_seq, tau_seq_real, lamb_seq = lamb_seq, delta = 1,
+                           max_iter = 50, r_X = 1)
+  
+ BIC_params <- BIC_simul$min_BIC %>%
+   arrange(BIC_log_p) %>%
+   head(1)
+  
+ result <- BIC_simul$simulation[[which(lamb_seq == BIC_params$lambda)]]
+```
+
+
+#SP
+
+```{r}
+X <- as.matrix(X)
+Y <- as.matrix(Y)
+K <- 2
+b <- 15
+tau_seq <- seq(from = 0.35, to = 0.65, length.out = b)
+idx_tau <- idx_tau <- (tau_seq >= "0.4" & tau_seq <= "0.6")
+tau_seq_real <- tau_seq[idx_tau]
+
+knots_seq <- seq(min(tau_seq) - 0.02, max(tau_seq) + 0.02, length.out = K)
+Phi <- fda::bsplineS(tau_seq, breaks= knots_seq, norder=2, nderiv=0, returnMatrix=FALSE)
+
+
+  V <- calc_V(as.matrix(X), Phi)
+  
+
+ lasso_coef <- matrix(nrow = p+1, ncol = m)
+ for(g in 1:m) {
+   cv.lasso <- cv.glmnet(x = X[, -1], y = Y[, g], alpha = 1, type.measure = "mae")
+   lasso_model <- glmnet(X[, -1], Y[, g], family = "gaussian", alpha = 1, lambda = cv.lasso$lambda.min)
+   lasso_coef[, g] <- c(lasso_model$a0, as.vector(lasso_model$beta))
+ }
+  
+  first_init_SP <- matrix(nrow = (p+1)*K, ncol = m)
+  for(g in 1:m) {
+    for(j in 0:p) {
+      first_init_SP[((j*K)+1):((j+1)*K), g] <- lasso_coef[j+1, g]
+    }
+  }
+
+ init_val_SP <- SP_model_r(delta = 1, lambda = 0.001, tol_error = 0.1^5, max_iter = 50, 
+                          X = X, Y = Y, V = V, Phi = Phi, theta_0 = first_init_SP, 
+                          tau_seq = tau_seq, weight = FALSE)
+ 
+ lamb_seq <- seq(3, 100, length.out = 20)
+ BIC_table <- list()
+
+cl <- makeCluster(20) #not to overload your computer
+registerDoParallel(cl) # Ready to parallel
+  
+BIC_table <- foreach(lambda = lamb_seq, .noexport = "add_decomp") %dopar% {
+  library(dplyr)
+  library(splines)
+  library(Matrix)
+  library(Rcpp)
+  library(glmnet)
+  library(fda)
+    
+  BIC_simul <- SP_model_BIC(X, Y, V, Phi, theta_0 = init_val_SP$theta, 
+                            tau_seq, tau_seq_real, lamb_seq = lambda, max_iter = 50, delta = 1)
+    BIC_simul$min_BIC
+  }
+stopCluster(cl)
+ 
+ BIC_params <- BIC_table %>%
+  bind_rows() %>%
+  arrange(BIC_log_p) %>%
+  head(1)
+
+ result <- SP_model_r(delta = 1, lambda = as.numeric(BIC_params$lambda), tol_error = 0.1^5, max_iter = 50, 
+                          X = X, Y = Y, V = V, Phi = Phi, theta_0 = init_val_SP$theta, tau_seq = tau_seq, weight = TRUE)
+ 
+
+
+```
+
+
+```{r}
+
+gamma_tau_hat_SP <- est_gamma(Phi[idx_tau, ], result_SP$theta)
+```
+
+
+
+```{r}
+zero_idx_est <- lapply(gamma_tau_hat_SP, FUN = function(x) which(abs(x) < 0.1^5, arr.ind = TRUE) %>% as_tibble) %>%
+    bind_rows (.id = "tau") %>%
+    group_by(row, col) %>%
+    summarise(zero = n(), .groups = "keep") %>%
+    filter(zero == length(gamma_tau_hat))
+
+Neg <- nrow(zero_idx_est)
+Pos <- prod(dim(gamma_tau_hat[[1]])) - Neg
+
+data.frame("Positive"=Pos, "Negative" = Neg)
+
+
+```
+
+```{r}
+lapply(gamma_tau_hat_SP, FUN = function(x) data.frame(col = rep(1:m, each = (p+1)),
+                                                   row = rep(1:(p+1), m),
+                                                   value = as.vector(x))) %>%
+  `names<-`(tau_seq_real) %>%
+  bind_rows(.id = "tau") %>%
+  mutate(is_nonzero = ifelse(abs(value) < 0.1^5, 0, 1)) %>%
+  group_by(col, row) %>%
+  summarise(is_nonzero = mean(is_nonzero)) %>%
+  mutate(is_nonzero = ifelse(is_nonzero == 0, 0, 1) %>% as.character) %>%
+  ggplot(aes(x = col, y = -row, fill = is_nonzero)) +
+  geom_tile(color = "grey") +
+  scale_fill_manual(values = c("white", "black")) + 
+  theme_bw() +
+  theme(axis.line = element_blank(),
+    panel.grid.major = element_blank(),
+    panel.grid.minor = element_blank(),
+    panel.border = element_blank(),
+    panel.background = element_blank(), 
+    axis.title.x = element_blank(), 
+    axis.text.x = element_blank(), 
+    axis.ticks.x = element_blank(), 
+    axis.title.y = element_blank(), 
+    axis.text.y = element_blank(), 
+    axis.ticks.y = element_blank()) +
+  ggtitle(expression("S("~tau[l]~") in SP model"))
+```
+
+
 # Prediction error
 
 
@@ -526,7 +661,7 @@ PE <- rep(0, 5)
 set.seed(1)
 sample_idx <- sample(1:5, size = nrow(X), replace = TRUE)
 
-K <- 10
+K <- 2
 b <- 15
 tau_seq <- seq(from = 0.35, to = 0.65, length.out = b)
 idx_tau <- idx_tau <- (tau_seq >= "0.4" & tau_seq <= "0.6")
@@ -573,17 +708,17 @@ for(i in 1:5) {
                          X = X_train, Y = Y_train, V = V, Phi = Phi, 
                          theta_0 = theta_init, Z_0 = X_train%*%alpha_init, tau_seq = tau_seq, weight = FALSE)
   
- log_lamb1 <- c( seq(-7, 7, length.out = 10))
+ log_lamb1 <- c( seq(0.9, 1.5, length.out = 10))
  lamb1_seq <- exp(log_lamb1)
 
- log_lamb2 <- c(seq(3,10, length.out = 10))
+ log_lamb2 <- c(seq(1.2, 3.2, length.out = 10))
  lamb2_seq <- exp(log_lamb2)
 
  BIC_table <- list()
 
  for(idx in 1:length(lamb1_seq)) {
    lamb1 <- lamb1_seq[idx]
-   cl <- makeCluster(11) #not to overload your computer
+   cl <- makeCluster(10) #not to overload your computer
    registerDoParallel(cl) # Ready to parallel
   
    temp_BIC <- foreach(lamb2 = lamb2_seq, .noexport = "add_decomp") %dopar% {
@@ -594,7 +729,7 @@ for(i in 1:5) {
      library(fda)
     
      BIC_simul <- add_decomp_BIC(X_train, Y_train, V, Phi, theta_0 = init_val$theta, Z_0 = init_val$Z,
-                                 tau_seq, tau_seq_real, lamb1_seq = lamb1, lamb2_seq = lamb2, max_iter = 50)
+                                 tau_seq, tau_seq_real, lamb1_seq = lamb1, lamb2_seq = lamb2, max_iter = 50, delta = 1)
     BIC_simul$table
   }
   stopCluster(cl)
@@ -604,8 +739,8 @@ for(i in 1:5) {
  BIC_params <- BIC_table %>% lapply(FUN = function(x) bind_rows(x)) %>%
   bind_rows() %>%
   mutate(LR_part = r_hat * max(1, m) / (2*n*m),  
-         LR = log(log(p)) * LR_part, 
-         SP = log(p) * SP_part, 
+         LR = log(n) * LR_part, 
+         SP = log(p)*log(log(n)) * SP_part, 
          BIC = log_Q + LR + SP) %>%
   arrange(BIC) %>% 
   head(1)
@@ -670,7 +805,7 @@ for(i in 1:5) {
   
  log_lamb <- c( seq(1, 10, length.out = 20))
  lamb_seq <- exp(log_lamb)
- BIC_simul <- LR_model_BIC(X_train, Y_train, Z_0 = init_val_LR$Z, tau_seq, tau_seq_real, lamb_seq, 
+ BIC_simul <- LR_model_BIC(X_train, Y_train, Z_0 = init_val_LR$Z, tau_seq, tau_seq_real, lamb_seq = lamb_seq, delta = 1,
                            max_iter = 50, r_X = 1)
   
  BIC_params <- BIC_simul$min_BIC %>%
@@ -702,7 +837,7 @@ PE <- rep(0, 5)
 set.seed(1)
 sample_idx <- sample(1:5, size = nrow(X), replace = TRUE)
 
-K <- 10
+K <- 2
 b <- 15
 tau_seq <- seq(from = 0.35, to = 0.65, length.out = b)
 idx_tau <- idx_tau <- (tau_seq >= "0.4" & tau_seq <= "0.6")
@@ -755,7 +890,7 @@ BIC_table <- foreach(lambda = lamb_seq, .noexport = "add_decomp") %dopar% {
   library(fda)
     
   BIC_simul <- SP_model_BIC(X_train, Y_train, V, Phi, theta_0 = init_val_SP$theta, 
-                            tau_seq, tau_seq_real, lamb_seq = lambda, max_iter = 50)
+                            tau_seq, tau_seq_real, lamb_seq = lambda, max_iter = 50, delta = 1)
     BIC_simul$min_BIC
   }
 stopCluster(cl)
