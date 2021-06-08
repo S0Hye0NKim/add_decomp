@@ -71,7 +71,8 @@ List add_decomp(double delta, double lambda_1, double lambda_2, double tol_error
     for(int g = 0; g<m; g++) {
       arma::vec r_j = eta_new.col(g) - (w_old.col(g)/delta);
       arma::vec theta_tilde_j = theta_0.col(g);
-      for(int j=0; j<(p+1); j++) {
+      theta_new.submat(0, g, K-1, g) = r_j.subvec(0, K-1);
+      for(int j=1; j<(p+1); j++) {
         arma::vec r_j_g = r_j.subvec(K*j, K*(j+1)-1);
         arma::vec theta_tilde_j_g = theta_tilde_j.subvec(K*j, K*(j+1)-1);
         double accum_r_j_g = 0;
@@ -201,6 +202,7 @@ List add_decomp(double delta, double lambda_1, double lambda_2, double tol_error
                                Named("params") = params);
   return estimate;
 }
+
 
 //[[Rcpp::export]]
 List LR_model(double delta, double lambda, double tol_error, int max_iter, arma::mat X,

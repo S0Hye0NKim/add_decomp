@@ -1,9 +1,3 @@
-scad_deriv <- function(x, lambda, gamma = 3.7) {
-  output <- ifelse(abs(x) <= lambda, lambda, 
-                   ifelse(abs(x) >= gamma*lambda, 0, (gamma*lambda - abs(x))/(gamma - 1)))
-  return(output)
-}
-
 add_decomp_r <- function(delta, lambda_1, lambda_2, tol_error, max_iter, X, Y, V, Phi, 
                          theta_0, Z_0, tau_seq, weight = TRUE) {
   # delta = step size
@@ -45,7 +39,8 @@ add_decomp_r <- function(delta, lambda_1, lambda_2, tol_error, max_iter, X, Y, V
     # Process for theta
     theta_new <- matrix(nrow = (p+1)*K, ncol = m)
     for (g in 1:m) {
-      for(j in 1:(p+1)) {
+      theta_new[1:K, g] <- eta_new[1:K, g] -  (w_old[1:K, g])/delta
+      for(j in 2:(p+1)) {
         theta_tilde <- theta_0[(K*(j-1) +1):(j*K), g]
         norm_theta_tilde <- ifelse(weight == TRUE, (theta_tilde^2) %>% sum %>% sqrt, 1)  # weight = 1/norm_theta_tilde
         eta_j_g <- eta_new[(K*(j-1) +1):(j*K), g]
