@@ -473,7 +473,8 @@ SP_model_r <- function(delta, lambda, tol_error, max_iter, X, Y, V, Phi,
     # Process for theta
     theta_new <- matrix(nrow = (p+1)*K, ncol = m)
     for (g in 1:m) {
-      for(j in 1:(p+1)) {
+      theta_new[1:K, g] <- eta_new[1:K, g] -  (w_old[1:K, g])/delta
+      for(j in 2:(p+1)) {
         theta_tilde <- theta_0[(K*(j-1) +1):(j*K), g]
         norm_theta_tilde <- ifelse(weight == TRUE, (theta_tilde^2) %>% sum %>% sqrt, 1)  # weight = 1/norm_theta_tilde
         eta_j_g <- eta_new[(K*(j-1) +1):(j*K), g]
