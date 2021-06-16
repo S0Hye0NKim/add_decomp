@@ -266,7 +266,7 @@ LR_model_BIC <- function(X, Y, Z_0, tau_seq, tau_seq_real, delta, lamb_seq, max_
   simulation <- list()
   for(lamb_idx in 1:length(lamb_seq)) {
     simulation[[lamb_idx]] <- LR_model_r(delta = delta, lambda = lamb_seq[lamb_idx], tol_error = 0.1^5, 
-                                       max_iter = max_iter, X = X, Y = Y, Z_0 = Z_0, tau_seq = tau_seq, weight = TRUE)
+                                         max_iter = max_iter, X = X, Y = Y, Z_0 = Z_0, tau_seq = tau_seq, weight = TRUE)
   }
   
   names(simulation) <- paste0("lambda=", lamb_seq)
@@ -279,7 +279,7 @@ LR_model_BIC <- function(X, Y, Z_0, tau_seq, tau_seq_real, delta, lamb_seq, max_
       Reduce("+", .) %>% as.vector %>% sum
     BIC[[i]] <- data.frame(log_Q = log(check_loss_err), r_hat = rankMatrix(result$Z)[1])
   }
-
+  
   names(BIC) <- lamb_seq
   BIC_data <- BIC %>% bind_rows(.id = "lambda") %>%
     mutate(term = (r_hat * max(r_X, m))/(2*n*m), 
@@ -318,8 +318,8 @@ SP_model_BIC <- function(X, Y, V, Phi, theta_0, tau_seq, tau_seq_real, delta, la
   simulation <- list()
   for(lamb_idx in 1:length(lamb_seq)) {
     simulation[[lamb_idx]] <- SP_model_r(delta = delta, lambda = lamb_seq[lamb_idx], tol_error = 0.1^5, 
-                                       max_iter = max_iter, X = X, Y = Y, V = V, Phi = Phi, theta_0 = theta_0, 
-                                       tau_seq = tau_seq, weight = TRUE)
+                                         max_iter = max_iter, X = X, Y = Y, V = V, Phi = Phi, theta_0 = theta_0, 
+                                         tau_seq = tau_seq, weight = TRUE)
   }
   
   names(simulation) <- paste0("lambda=", lamb_seq)
@@ -333,32 +333,29 @@ SP_model_BIC <- function(X, Y, V, Phi, theta_0, tau_seq, tau_seq_real, delta, la
                              tau = as.list(tau_seq_real), SIMPLIFY = FALSE) %>%
       lapply(FUN = function(x) sum(x)) %>% unlist %>% sum
     gamma_tau_hat <- est_gamma(Phi[idx_tau, ], result$theta)
-    S_hat <- check_sp_table(true = matrix(0, nrow = (p+1), ncol = m), 
-                            est = gamma_tau_hat, table = TRUE, tol = 0.1^5, tau_seq = tau_seq_real) %>%
-      .$Est_Positive %>% sum
-    BIC[[i]] <- data.frame(log_Q = log(check_loss_err), S_hat = S_hat)
+    zero_idx_est <- lapply(gamma_tau_hat, FUN = function(x) which(abs(x) < 0.1^5, arr.ind = TRUE) %>% as_tibble) %>%
+      bind_rows(.id = "tau") %>%
+      group_by(row, col) %>%
+      summarise(zero = n(), .groups = "keep") %>%
+      filter(zero == sum(idx_tau))
+    num_nz <- nrow(zero_idx_est)
+    S_hat <- (gamma_tau_hat[[1]] %>% dim %>% prod) - num_nz 
+    num_nz_intercept <- m - (zero_idx_est %>% filter(row == 1) %>% nrow)
+    
+    BIC[[i]] <- data.frame(log_Q = log(check_loss_err), S_hat = S_hat, num_nz_intercept = num_nz_intercept)
   }
   
   names(BIC) <- lamb_seq
   BIC_data <- BIC %>% bind_rows(.id = "lambda") %>%
-    mutate(term = (K * S_hat)/(2*n*m), 
-           BIC_log_sum = log_Q + log(p+m)*term, 
-           BIC_log_p = log_Q + log(p)*term, 
-           BIC_log_n = log_Q + log(n)*term, 
-           BIC_llog_p = log_Q + log(log(p))*term,
-           BIC_llog_n = log_Q + log(log(n))*term) %>%
-    group_by(lambda) %>%
-    select_at(vars(starts_with("BIC"))) %>%
-    ungroup()
+    mutate(S_hat_net = S_hat - num_nz_intercept, 
+           term = (K * S_hat_net)/(2*n*m), 
+           BIC_log_p = log_Q + log(p)*term)
   
-  BIC_val_min <- apply(select_at(BIC_data, vars(starts_with("BIC"))), 2, min) %>%
-    `names<-`(value = c("log_sum", "log_p", "log_n", "llog_p", "llog_n"))
+  BIC_params <- BIC_data %>% arrange(BIC_log_p) %>%
+    head(1) %>%
+    mutate_all(as.numeric)
   
-  min_BIC <- filter(BIC_data, BIC_log_sum == BIC_val_min["log_sum"]| BIC_log_p == BIC_val_min["log_p"] |
-                      BIC_log_n == BIC_val_min["log_n"] | BIC_llog_p == BIC_val_min["llog_p"] | 
-                      BIC_llog_n == BIC_val_min["llog_n"])
-  
-  output <- list(min_BIC = min_BIC, 
+  output <- list(BIC_params = BIC_params, 
                  BIC_data = BIC_data, 
                  simulation = simulation)
   
