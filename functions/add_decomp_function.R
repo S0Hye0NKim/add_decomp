@@ -191,22 +191,24 @@ cal_cl_sum <- function(e, tau_seq) {
 
 # parameter selection via BIC
 add_decomp_BIC <- function(X, Y, V, Phi, theta_0, Z_0, tau_seq, tau_seq_real, delta, lamb1_seq, lamb2_seq, 
-                           max_iter) {
+                           max_iter, fun_type = "R") {
   m <- ncol(Y)
   p <- ncol(X) - 1
   K <- ncol(V[[1]])/(p+1)
   n <- nrow(X)
   idx_tau <- tau_seq %in% tau_seq_real
+  fun_name <- ifelse(fun_type == "R", add_decomp_r, add_decomp)
   
   # iteration for lamb1_seq and lamb2_seq
   simulation <- list()
   for(lamb1_idx in 1:length(lamb1_seq)) {
     simulation[[lamb1_idx]] <- list()
     for(lamb2_idx in 1:length(lamb2_seq)) {
-      simulation[[lamb1_idx]][[lamb2_idx]] <- add_decomp_r(delta = delta, lambda_1 = lamb1_seq[lamb1_idx], 
-                                                           lambda_2 = lamb2_seq[lamb2_idx], tol_error = 0.1^5, 
-                                                           max_iter = max_iter, X = X, Y = Y, V = V, Phi = Phi, 
-                                                           theta_0, Z_0, tau_seq = tau_seq, weight = TRUE)
+      argument <- list(delta = delta, lambda_1 = lamb1_seq[lamb1_idx], lambda_2 = lamb2_seq[lamb2_idx], 
+                       tol_error = 0.1^5, max_iter = max_iter, X = X, Y = Y, V = V, Phi = Phi, 
+                       theta_0, Z_0, tau_seq = tau_seq, weight = TRUE)
+      
+      simulation[[lamb1_idx]][[lamb2_idx]] <- do.call(fun_name, args = argument)
     }
   }
   
