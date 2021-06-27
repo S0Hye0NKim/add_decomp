@@ -1,8 +1,6 @@
 ---
-title: "CCLE"
-author: "Sohyeon Kim"
-date: "10/18/2020"
-output: pdf_document
+title: "CCLE new"
+output: html_notebook
 ---
 
 # packages
@@ -20,28 +18,22 @@ library(glmnet)
 library(foreach)
 library(doParallel)
 library(gplots)
+library(tibble)
 
 source("https://raw.githubusercontent.com/S0Hye0NKim/add_decomp/master/functions/add_decomp_function.R")
 sourceCpp("[KSH]add_decomp_function.cpp")
 ```
-
-
-
 
 # 0. Data & Screening
 
 
 ## 0-(1) Screening Y
 
+
 ```{r message = FALSE, warning = FALSE}
-Y <- fread("ksh_resp_mat.csv")[, -1]
+Y <- fread("CCLE_Y_new.csv")
+
 m <- ncol(Y)
-trt_nm <- readLines("ksh_trt_nm.txt", encoding = "UTF-8") %>%
-  str_split(pattern = ",") %>%
-  sapply(FUN = function(x) str_remove_all(x, pattern = "'") %>% str_trim) %>%
-  unlist()
-trt_nm <- trt_nm[trt_nm != ""]
-names(Y) <- trt_nm
 
 Y_sd <- Y[, lapply(.SD, sd)] %>% as.matrix %>% t()
 data.frame(Y_sd) %>%
@@ -49,34 +41,10 @@ data.frame(Y_sd) %>%
   dplyr::select(group, Y_sd) %>%
   arrange(Y_sd) %>% head(5)
 
-Y <- Y[, -"Panobinostat"] 
+Y <- Y[, -"Panobinostat"] %>%
+  column_to_rownames(var = "CCLE_Name") %>%
+  as.matrix
 m <- ncol(Y)
-```
-
-```{r}
-Y <- fread("ksh_resp_mat.csv")[, -1]
-m <- ncol(Y)
-trt_nm <- readLines("ksh_trt_nm.txt", encoding = "UTF-8") %>%
-  str_split(pattern = ",") %>%
-  sapply(FUN = function(x) str_remove_all(x, pattern = "'") %>% str_trim) %>%
-  unlist()
-trt_nm <- trt_nm[trt_nm != ""]
-names(Y) <- trt_nm
-
-Y_sd <- Y[, lapply(.SD, sd)] %>% as.matrix %>% t()
-data.frame(Y_sd) %>%
-  mutate(group = rownames(.)) %>%
-  dplyr::select(group, Y_sd) %>%
-  arrange(Y_sd) %>%
-  mutate(color = ifelse(Y_sd == min(Y_sd), "red", "blue")) %>%
-  ggplot() +
-  geom_bar(aes(x = reorder(group, -Y_sd), y = Y_sd, fill = color), stat = "identity") +
-  coord_flip() +
-  scale_fill_manual(values = c("blue", "red")) +
-  labs(x = "drugs", 
-       y = "standard deviation") +
-  guides(fill = FALSE) +
-  ggtitle(label = "Filtering response variables")
 ```
 
 
@@ -90,20 +58,21 @@ Panobinostat 의 sd = 0.08 -> 제거
  * Assumption : Genes with small sd are irrelevant to the drug responses. 
 
 ```{r}
-X <- fread("ksh_express_mat.csv")
-cell_name <- X[[1]]
-rownames(X) <- cell_name
-X <- X[, -1]
+X <- fread("CCLE_X_new.csv")
+X <- X[, -"Broad_ID"]
 
-X_sd <- X[, lapply(.SD, FUN = sd)] %>% as.matrix() %>% t()
+X_sd <- X[, -"CCLE_Name"][, lapply(.SD, FUN = sd)] %>%
+  as.matrix() %>% t()
 idx_scr_sd <-  data.frame(X_sd) %>%
   mutate(variable = rownames(.)) %>%
   dplyr::select(variable, X_sd) %>%
   arrange(-X_sd) %>% 
   .[1:10000, ] %>% .$variable
 
-X <- dplyr::select(X, idx_scr_sd)
+X <- dplyr::select(X, c(CCLE_Name,all_of(idx_scr_sd))) %>%
+  column_to_rownames(var = "CCLE_Name")
 ```
+
 
 
 ### 0-(2)-(2) Correlation of X and Y
@@ -116,12 +85,13 @@ $$\frac{1}{23}\sum_{g\ne11}|\text{cor}(x_j, y_g)|$$
 n <- nrow(X)
 p <- 100
 
+
 idx_scr_cor <- cor(X, Y) %>% abs %>%
   apply(MARGIN = 1, FUN = mean) %>%
   data.frame(variable = names(.), cor = .) %>%
   arrange(-cor) %>% first(p) %>% .$variable
 
-X <- dplyr::select(X, idx_scr_cor) %>% 
+X <- dplyr::select(X, all_of(idx_scr_cor)) %>% 
   apply(MARGIN = 2, FUN = function(x) (x - mean(x))/(sd(x)*sqrt((n-1)/n))) %>%
   cbind(1, .)
 colnames(X)[1] <- "intercept"
@@ -129,12 +99,13 @@ gene_ex <- colnames(X)
 ```
 
 
+## 0-(3). spline
 
 ```{r}
 K <- 5
 b <- 15
 tau_seq <- seq(from = 0.35, to = 0.65, length.out = b)
-idx_tau <- idx_tau <- (tau_seq >= "0.4" & tau_seq <= "0.6")
+idx_tau <- (tau_seq >= "0.4" & tau_seq <= "0.6")
 tau_seq_real <- tau_seq[idx_tau]
 
 knots_seq <- seq(min(tau_seq) - 0.02, max(tau_seq) + 0.02, length.out = K)
@@ -143,6 +114,8 @@ Phi <- fda::bsplineS(tau_seq, breaks= knots_seq, norder=2, nderiv=0, returnMatri
 V <- calc_V(as.matrix(X), Phi)
 ```
 
+
+## 0-(4). first initial value 
 
 ```{r}
 set.seed(1)
@@ -174,20 +147,18 @@ theta_init <- matrix(nrow = (p+1)*K, ncol = m)
 ```
 
 
+
 # 1. Initial value
 
 ```{r}
-init_val <- add_decomp_r(delta = 1, lambda_1 = 0.01, lambda_2 = 0.001, tol_error = 0.1^5, max_iter = 50,
+init_val <- add_decomp(delta = 1, lambda_1 = 0.01, lambda_2 = 0.001, tol_error = 0.1^5, max_iter = 50,
                          X = X, Y = Y, V = V, Phi = Phi, 
                          theta_0 = theta_init, Z_0 = X%*%alpha_init, tau_seq = tau_seq, weight = FALSE)
 
 ```
 
-
-
-
-
 ```{r}
+init_val$Z %>% rankMatrix
 gamma_tau_hat <- est_gamma(Phi[idx_tau, ], init_val$theta)
 
 check_sp_table(true = matrix(0, nrow = (p+1), ncol = m), 
@@ -195,13 +166,14 @@ check_sp_table(true = matrix(0, nrow = (p+1), ncol = m),
 ```
 
 
+
 # 2. BIC
 
 ```{r}
-log_lamb1 <- c( seq(0.9, 4, length.out = 20))
+log_lamb1 <- c( seq(0.1, 2, length.out = 20))
 lamb1_seq <- exp(log_lamb1)
 
-log_lamb2 <- c(seq(1, 2.2, length.out = 20))
+log_lamb2 <- c(seq(1, 2, length.out = 20))
 lamb2_seq <- exp(log_lamb2)
 
 BIC_table <- list()
@@ -235,35 +207,34 @@ BIC_table %>% lapply(FUN = function(x) bind_rows(x)) %>%
          SP = log(p) * log(log(n)) * K * S_hat_net / (2*n*m),
          BIC = log_Q + LR + SP) %>%
   mutate_all(as.numeric) %>%
-  filter(S_hat_net != 0, lambda_2 < 10) %>%
+  filter(S_hat_net != 0) %>%
   arrange(BIC) %>%  
   head(6)
 
 ```
 
 
-
-
 # 3. Proposed Model
 
 ```{r}
-log_lamb1 <- c( seq(0.9, 4, length.out = 20))
+log_lamb1 <- c( seq(0.1, 2, length.out = 20))
 lamb1_seq <- exp(log_lamb1)
 
-log_lamb2 <- c(seq(1, 2.2, length.out = 20))
+log_lamb2 <- c(seq(1, 2, length.out = 20))
 lamb2_seq <- exp(log_lamb2)
 
-lambda_1 <- lamb1_seq[8]
+lambda_1 <- lamb1_seq[10]
 lambda_2 <- lamb2_seq[20]
 ```
 
 
 
 ```{r}
-result <- add_decomp_r(delta = 1, lambda_1 = lambda_1, lambda_2 = lambda_2, tol_error = 0.1^5, max_iter = 50,
+result <- add_decomp(delta = 1, lambda_1 = lambda_1, lambda_2 = lambda_2, tol_error = 0.1^5, max_iter = 50,
                          X = X, Y = Y, V = V, Phi = Phi, 
                          theta_0 = init_val$theta, Z_0 = init_val$Z, tau_seq = tau_seq, weight = TRUE)
 ```
+
 
 
 ## Low-rank matrix
@@ -289,6 +260,7 @@ sing_val %>% round(2)
 colnames(L_hat) <- colnames(Y)
 heatmap.2(L_hat, scale = "none", col = bluered(100), 
           trace = "none", density.info = "none")
+title("L hat heatmap")
 ```
 
 ```{r}
@@ -296,14 +268,44 @@ r_hat <- rankMatrix(L_hat)[1]
 L_hat_t <- t(L_hat)
 dist_mat <- dist(L_hat_t, method = "euclidean")
 cluster <- hclust(dist_mat, method = "complete")
-plot(cluster, cex = 0.6)
+plot(cluster, cex = 0.6, main = "clustering from L hat")
 rect.hclust(cluster, k = r_hat, border = 2:(1+r_hat))
 ```
 
+
+```{r}
+SVD_L <- svd(L_hat)
+col_sp <- SVD_L$v %>% .[, 1:3]
+
+data.frame(col_sp) %>%
+  `colnames<-`(value = paste0("V", 1:3)) %>%
+  mutate(treatment = colnames(Y)) %>%
+  gather(key = "Variable", value = "value", -treatment) %>%
+  filter(Variable != "V1") %>%
+  ggplot() +
+  geom_col(aes(x = treatment, y = value)) +
+  theme(axis.title.x = element_blank(), 
+    axis.text.x = element_text(angle = 90)) +
+  facet_wrap(~Variable)
+```
+
+
+
+```{r}
+weak_signals <- c("Lapatinib", "Nutlin-3", "Paclitaxel", "PHA-665752", "Irinotecan", "17-AAG", "LBW242", "L-685458", "PD-0332991", "TAE684", "Topotecan", "AZD0530", "Erlotinib", "Nilotinib", "PF2341066", "Sorafenib")
+
+L_hat[, weak_signals] %>%
+  apply(MARGIN = 2, FUN = function(x) abs(x) %>% median)
+
+```
+
+
 ```{r}
 colnames(result$Z) <- colnames(Y)
+rownames(result$Z) <- rownames(Y)
 heatmap.2(result$Z, scale = "none", col = bluered(100), 
           trace = "none", density.info = "none")
+title("Z hat heatmap")
 ```
 
 ```{r}
@@ -311,7 +313,7 @@ r_hat <- rankMatrix(result$Z)[1]
 Z_hat_t <- t(result$Z)
 dist_mat <- dist(Z_hat_t, method = "euclidean")
 cluster <- hclust(dist_mat, method = "complete")
-plot(cluster, cex = 0.6)
+plot(cluster, cex = 0.6, main = "clustering from Z hat")
 rect.hclust(cluster, k = r_hat, border = 2:(1+r_hat))
 ```
 
@@ -340,35 +342,10 @@ data.frame("Positive"=Pos, "Negative" = Neg)
 
 ```
 
-## heatmap
-
-
-```{r}
-data.frame(col = rep(1:m, each = (p+1)), 
-           row = rep(1:(p+1), m),
-           value = as.vector(gamma_tau_hat[[5]])) %>%
-  mutate(value = ifelse(abs(value) < 0.1^5, 0, value)) %>%
-  ggplot(aes(x = col, y = -row, fill = value)) +
-  geom_tile(color = "grey") +
-  scale_fill_gradient2(low = "red",mid = "white", high = "blue") +
-  theme_bw() +
-  theme(axis.line = element_blank(),
-    panel.grid.major = element_blank(),
-    panel.grid.minor = element_blank(),
-    panel.border = element_blank(),
-    panel.background = element_blank(), 
-    axis.title.x = element_blank(), 
-    axis.text.x = element_blank(), 
-    axis.ticks.x = element_blank(), 
-    axis.title.y = element_blank(), 
-    axis.text.y = element_blank(), 
-    axis.ticks.y = element_blank()) +
-  ggtitle(expression(Gamma~"("~tau[3]~"=0.5)"))
-```
-
-
 ```{r}
 library(ggplot2)
+Y_col <- factor(colnames(Y), ordered = TRUE, levels = colnames(Y))
+
 lapply(gamma_tau_hat, FUN = function(x) data.frame(col = rep(1:m, each = (p+1)),
                                                    row = rep(1:(p+1), m),
                                                    value = as.vector(x))) %>%
@@ -377,8 +354,10 @@ lapply(gamma_tau_hat, FUN = function(x) data.frame(col = rep(1:m, each = (p+1)),
   mutate(is_nonzero = ifelse(abs(value) < 0.1^5, 0, 1)) %>%
   group_by(col, row) %>%
   summarise(is_nonzero = mean(is_nonzero)) %>%
-  mutate(is_nonzero = ifelse(is_nonzero == 0, 0, 1) %>% as.character) %>%
-  ggplot(aes(x = col, y = -row, fill = is_nonzero)) +
+  ungroup() %>%
+  mutate(is_nonzero = ifelse(is_nonzero == 0, 0, 1) %>% as.character, 
+         treatment = rep(Y_col, each = p+1)) %>%
+  ggplot(aes(x = treatment, y = -row, fill = is_nonzero)) +
   geom_tile(color = "grey") +
   scale_fill_manual(values = c("white", "black")) + 
   theme_bw() +
@@ -388,35 +367,21 @@ lapply(gamma_tau_hat, FUN = function(x) data.frame(col = rep(1:m, each = (p+1)),
     panel.border = element_blank(),
     panel.background = element_blank(), 
     axis.title.x = element_blank(), 
-    axis.text.x = element_blank(), 
-    axis.ticks.x = element_blank(), 
+    axis.text.x = element_text(angle = 90), 
     axis.title.y = element_blank(), 
     axis.text.y = element_blank(), 
     axis.ticks.y = element_blank()) +
   ggtitle(expression("S("~tau[l]~") in AD model"))
 ```
 
-```{r}
-lapply(gamma_tau_hat, FUN = function(x) data.frame(col = rep(1:m, each = (p+1)),
-                                                   row = rep(1:(p+1), m),
-                                                   value = as.vector(x))) %>%
-  `names<-`(tau_seq_real) %>%
-  bind_rows(.id = "tau") %>%
-  mutate(is_nonzero = ifelse(abs(value) < 0.1^5, 0, 1)) %>%
-  group_by(col, row) %>%
-  summarise(is_nonzero = mean(is_nonzero)) %>%
-  mutate(is_nonzero = ifelse(is_nonzero == 0, 0, 1) %>% as.character) %>%
-  filter(is_nonzero == 1, row != 1) %>%
-  arrange(col) %>%
-  dplyr::select(row, col)
-```
-
-
 
 ## smooth function
 
+
 ```{r}
 library(tidyr)
+library(rebus)
+
 idx_nz_est <- lapply(gamma_tau_hat, FUN = function(x) which(abs(x) > 0.1^5, arr.ind = TRUE) %>% as_tibble) %>%
     bind_rows (.id = "tau") %>%
     group_by(row, col) %>%
@@ -427,150 +392,159 @@ gamma_data <- gamma_tau_hat %>%
            data.frame(row = idx_nz_est$row, col = idx_nz_est$col, value = . )) %>%
   `names<-`(value = tau_seq_real) %>%
   bind_rows(.id = "tau") %>%
-  filter(row != 1, col == 1) %>% 
+  filter(row != 1, col == 13) %>% 
   unite(col = index, row, col, sep = ",") %>%
   mutate(index = paste0("(", index, ")"), tau = as.numeric(tau))
+
+row_pattern <- "\\(" %R% one_or_more(DGT)
+col_pattern <- one_or_more(DGT) %R% "\\)"
+
+gamma_data <- mutate(gamma_data, row = str_extract(index, pattern = row_pattern) %>% parse_number, 
+                     col = str_extract(index, pattern = col_pattern) %>% parse_number) %>%
+  left_join(data.frame(row = 1:ncol(X), row_names = colnames(X)), by = "row") %>%
+  left_join(data.frame(col = 1:ncol(Y), col_names = colnames(Y)), by = "col")
 
 gamma_data_list <- split(gamma_data, gamma_data$index)
 spline_int <- lapply(gamma_data_list, FUN = function(x) as.data.frame(spline(x$tau, x$value))) %>%
-  bind_rows(.id = "index")
+  bind_rows(.id = "index") %>%
+  mutate(row = str_extract(index, pattern = row_pattern) %>% parse_number, 
+         col = str_extract(index, pattern = col_pattern) %>% parse_number) %>%
+  left_join(data.frame(row = 1:ncol(X), row_names = colnames(X)), by = "row") %>%
+  left_join(data.frame(col = 1:ncol(Y), col_names = colnames(Y)), by = "col")
 
 ggplot(gamma_data) +
-  geom_point(aes(x = tau, y = value, color = index)) +
-  geom_line(data = spline_int, aes(x = x, y = y, group = index, color = index)) +
+  geom_point(aes(x = tau, y = value, color = row_names)) +
+  geom_line(data = spline_int, aes(x = x, y = y, group = row_names, color = row_names)) +
   ggtitle(expression("S("~tau[l]~") smooth function"))
-
 ```
 
-
-
-```{r}
-
-ggplot(gamma_data) +
-  geom_line(aes(x = tau, y = value, group = index, color = index), size = 1.1) +
-  scale_color_discrete(name = "drug", labels = c("AEW541", "PD-0325901", "AZD6244")) +
-  labs(x = expression(tau[l])) +
-  ggtitle(label = "17266th gene")
-```
+# 4. LR model
 
 ```{r}
-gamma_tau_hat %>%
-  lapply(FUN = function(x) x[idx_nz_est$row, idx_nz_est$col] %>% diag %>%
-           data.frame(row = idx_nz_est$row, col = idx_nz_est$col, value = . )) %>%
-  `names<-`(value = tau_seq_real) %>%
-  bind_rows(.id = "tau") %>%
-  filter(row %in% c(12, 22, 57, 73, 95)) %>%
-  filter(col %in% c(15,18)) %>% 
-  mutate( tau = as.numeric(tau), row = as.factor(row), col = as.factor(col), 
-          row = case_when(row == 12 ~ "17786th gene", 
-                          row == 22 ~ "17184th gene", 
-                          row == 57 ~ "16647th gene", 
-                          row == 73 ~ "17266th gene", 
-                          row == 95 ~ "4828th gene")) %>%
-  ggplot() +
-  geom_line(aes(x = tau, y = value, group = col, color = col), size = 1.1) +
-  facet_wrap(~row) +
-  scale_color_discrete(name = "drug", labels = c("PD-0325901", "AZD6244")) +
-  labs(x = expression(tau[l]))
-```
-
-
-```{r}
-gamma_tau_hat_full <- est_gamma(Phi, result$theta)
-
-
-idx_nz_est <- lapply(gamma_tau_hat_full, FUN = function(x) which(abs(x) > 0.1^5, arr.ind = TRUE) %>% as_tibble) %>%
-    bind_rows (.id = "tau") %>%
-    group_by(row, col) %>%
-    summarise(zero = n()) 
-
-gamma_data <- gamma_tau_hat_full %>%
-  lapply(FUN = function(x) x[idx_nz_est$row, idx_nz_est$col] %>% diag %>%
-           data.frame(row = idx_nz_est$row, col = idx_nz_est$col, value = . )) %>%
-  `names<-`(value = tau_seq) %>%
-  bind_rows(.id = "tau") %>%
-  filter(col == 15, row != 1) %>% 
-  unite(col = index, row, col, sep = ",") %>%
-  mutate(index = paste0("(", index, ")"), tau = as.numeric(tau))
-
-spline_int <- as.data.frame(spline(gamma_data$tau, gamma_data$value))
-
-ggplot(gamma_data) +
-  geom_line(aes(x = tau, y = value, group = index, color = index))
-
-```
-
-
-# LR
-
-```{r}
-X <- as.matrix(X)
-Y <- as.matrix(Y)
+set.seed(1)
 ridge_coef <- matrix(nrow = p+1, ncol = m)
-  for(g in 1:m) {
-    cv.ridge <- cv.glmnet(x = X[, -1], y = Y[, g], alpha = 0, type.measure = "mae")
-    ridge_model <- glmnet(X[, -1], Y[, g], family = "gaussian", alpha = 0, 
-                          lambda = cv.ridge$lambda.min)
-    ridge_coef[, g] <- c(ridge_model$a0, as.vector(ridge_model$beta))
-  }
- first_init_LR <- ridge_coef
-  
- init_val_LR <- LR_model_r(delta = 0.1, lambda = 0.05, tol_error = 0.1^5, max_iter = 50, 
-                          X = X, Y = Y, Z_0 = X %*% first_init_LR, 
-                          tau_seq = tau_seq, weight = FALSE)
- 
- log_lamb <- c( seq(1, 10, length.out = 20))
- lamb_seq <- exp(log_lamb)
- BIC_simul <- LR_model_BIC(X, Y, Z_0 = init_val_LR$Z, tau_seq, tau_seq_real, lamb_seq = lamb_seq, delta = 1,
-                           max_iter = 50, r_X = 1)
-  
- BIC_params <- BIC_simul$min_BIC %>%
-   arrange(BIC_log_p) %>%
-   head(1)
-  
- result <- BIC_simul$simulation[[which(lamb_seq == BIC_params$lambda)]]
+for(g in 1:m) {
+  cv.ridge <- cv.glmnet(x = X[, -1], y = Y[, g], alpha = 0, type.measure = "mae")
+  ridge_model <- glmnet(X[, -1], Y[, g], family = "gaussian", alpha = 0, lambda = cv.ridge$lambda.min)
+  ridge_coef[, g] <- c(ridge_model$a0, as.vector(ridge_model$beta))
+}
+
+first_init_LR <- ridge_coef
+init_val_LR <- LR_model_r(delta = 1, lambda = 0.1, tol_error = 0.1^5, max_iter = 50, 
+                          X = X, Y = Y, Z_0 = X %*% first_init_LR, tau_seq = tau_seq, weight = FALSE)
 ```
 
 
-#SP
+```{r}
+lamb_seq <- seq(0.1^20, 0.1, length.out = 25)
+r_X <- rankMatrix(X[, -1])
+BIC_simul <- LR_model_BIC(X = X, Y = Y, Z_0 = init_val_LR$Z, tau_seq = tau_seq, tau_seq_real = tau_seq_real, delta = 1, lamb_seq = lamb_seq, max_iter = 50, r_X = 1)
+  
+BIC_params <- BIC_simul$min_BIC %>%
+  arrange(BIC_log_p) %>%
+  mutate_all(as.numeric) %>%
+  head(1)
+```
+
 
 ```{r}
-X <- as.matrix(X)
-Y <- as.matrix(Y)
-K <- 2
-b <- 15
-tau_seq <- seq(from = 0.35, to = 0.65, length.out = b)
-idx_tau <- idx_tau <- (tau_seq >= "0.4" & tau_seq <= "0.6")
-tau_seq_real <- tau_seq[idx_tau]
+lamb_seq <- seq(0.1^20, 0.1, length.out = 25)
+lambda <- lamb_seq[16]
 
-knots_seq <- seq(min(tau_seq) - 0.02, max(tau_seq) + 0.02, length.out = K)
-Phi <- fda::bsplineS(tau_seq, breaks= knots_seq, norder=2, nderiv=0, returnMatrix=FALSE)
+result_LR <- LR_model_r(delta = 1, lambda = lambda, tol_error = 0.1^5, max_iter = 50, X = X, Y = Y, Z_0 = init_val_LR$Z, tau_seq = tau_seq, weight = TRUE)
+```
 
 
-  V <- calc_V(as.matrix(X), Phi)
+
+## Low-rank matrix
+
+```{r}
+X_tilde <- X[, -1]
+
+L_hat <- solve(t(X_tilde) %*% X_tilde) %*% t(X_tilde) %*% result_LR$Z
+L_hat %>% rankMatrix
+```
+
+
+```{r}
+sing_val <- svd(L_hat)$d
+sum(sing_val[1:1])/sum(sing_val)
+rankMatrix(result_LR$Z)
+sing_val %>% round(2)
+```
+
+
+
+```{r}
+colnames(L_hat) <- colnames(Y)
+heatmap.2(L_hat, scale = "none", col = bluered(100), 
+          trace = "none", density.info = "none")
+title("L hat heatmap")
+```
+
+```{r}
+r_hat <- rankMatrix(L_hat)[1]
+L_hat_t <- t(L_hat)
+dist_mat <- dist(L_hat_t, method = "euclidean")
+cluster <- hclust(dist_mat, method = "complete")
+plot(cluster, cex = 0.6, main = "clustering from L hat")
+rect.hclust(cluster, k = r_hat, border = 2:(1+r_hat))
+```
+
+
+```{r}
+colnames(result_LR$Z) <- colnames(Y)
+rownames(result_LR$Z) <- rownames(Y)
+heatmap.2(result_LR$Z, scale = "none", col = bluered(100), 
+          trace = "none", density.info = "none")
+title("Z hat heatmap")
+```
+
+```{r}
+r_hat <- rankMatrix(result_LR$Z)[1]
+Z_hat_t <- t(result_LR$Z)
+dist_mat <- dist(Z_hat_t, method = "euclidean")
+cluster <- hclust(dist_mat, method = "complete")
+plot(cluster, cex = 0.6, main = "clustering from Z hat")
+rect.hclust(cluster, k = r_hat, border = 2:(1+r_hat))
+```
+
+
+# 5. SP model
+
+```{r}
+set.seed(1)
+lasso_coef <- matrix(nrow = p+1, ncol = m)
+for(g in 1:m) {
+  cv.lasso <- cv.glmnet(x = X[, -1], y = Y[, g], alpha = 1, type.measure = "mae")
+  lasso_model <- glmnet(X[, -1], Y[, g], family = "gaussian", alpha = 1, lambda = cv.lasso$lambda.min)
+  lasso_coef[, g] <- c(lasso_model$a0, as.vector(lasso_model$beta))
+}
   
-
- lasso_coef <- matrix(nrow = p+1, ncol = m)
- for(g in 1:m) {
-   cv.lasso <- cv.glmnet(x = X[, -1], y = Y[, g], alpha = 1, type.measure = "mae")
-   lasso_model <- glmnet(X[, -1], Y[, g], family = "gaussian", alpha = 1, lambda = cv.lasso$lambda.min)
-   lasso_coef[, g] <- c(lasso_model$a0, as.vector(lasso_model$beta))
- }
-  
-  first_init_SP <- matrix(nrow = (p+1)*K, ncol = m)
-  for(g in 1:m) {
-    for(j in 0:p) {
-      first_init_SP[((j*K)+1):((j+1)*K), g] <- lasso_coef[j+1, g]
-    }
+first_init_SP <- matrix(nrow = (p+1)*K, ncol = m)
+for(g in 1:m) {
+  for(j in 0:p) {
+    first_init_SP[((j*K)+1):((j+1)*K), g] <- lasso_coef[j+1, g]
   }
+}
+  
+init_val_SP <- SP_model_r(delta = 1, lambda = 0.01, tol_error = 0.1^5, max_iter = 50, 
+                          X = X, Y = Y, V = V, Phi = Phi, theta_0 = first_init_SP, tau_seq = tau_seq, weight = FALSE)
+```
 
- init_val_SP <- SP_model_r(delta = 1, lambda = 0.001, tol_error = 0.1^5, max_iter = 50, 
-                          X = X, Y = Y, V = V, Phi = Phi, theta_0 = first_init_SP, 
-                          tau_seq = tau_seq, weight = FALSE)
- 
- lamb_seq <- seq(3, 100, length.out = 20)
- BIC_table <- list()
+```{r}
+idx_tau <- (tau_seq >= 0.4 & tau_seq <= 0.6)
+gamma_tau_hat_SP <- est_gamma(Phi[idx_tau, ], init_val_SP$theta)
 
+check_sp_table(true = matrix(0, nrow = (p+1), ncol = m), est = gamma_tau_hat_SP, table = TRUE, tol = 0.1^5, tau_seq = tau_seq_real)
+```
+
+
+```{r}
+log_lamb <- c(seq(1, 2, length.out = 20))
+lamb_seq <- exp(log_lamb)
+
+BIC_table <- list()
 cl <- makeCluster(20) #not to overload your computer
 registerDoParallel(cl) # Ready to parallel
   
@@ -578,49 +552,68 @@ BIC_table <- foreach(lambda = lamb_seq, .noexport = "add_decomp") %dopar% {
   library(dplyr)
   library(splines)
   library(Matrix)
-  library(Rcpp)
   library(glmnet)
   library(fda)
     
-  BIC_simul <- SP_model_BIC(X, Y, V, Phi, theta_0 = init_val_SP$theta, 
+  BIC_simul <- SP_model_BIC(X, Y, V, Phi, theta_0 = init_val_SP$theta,
                             tau_seq, tau_seq_real, lamb_seq = lambda, max_iter = 50, delta = 1)
-    BIC_simul$min_BIC
-  }
+    BIC_simul$BIC_data
+}
 stopCluster(cl)
- 
- BIC_params <- BIC_table %>%
+  
+BIC_params <- BIC_table %>%
   bind_rows() %>%
+  filter(S_hat_net != 0) %>%
   arrange(BIC_log_p) %>%
+  mutate_all(as.numeric) %>%
   head(1)
-
- result <- SP_model_r(delta = 1, lambda = as.numeric(BIC_params$lambda), tol_error = 0.1^5, max_iter = 50, 
-                          X = X, Y = Y, V = V, Phi = Phi, theta_0 = init_val_SP$theta, tau_seq = tau_seq, weight = TRUE)
- 
-
-
 ```
 
+```{r}
+log_lamb <- c(seq(1, 2, length.out = 20))
+lamb_seq <- exp(log_lamb)
+
+lambda <- lamb_seq[19]
+result_SP <- SP_model_r(delta = 1, lambda = lambda, tol_error = 0.1^5, max_iter = 50, X = X, Y = Y, V = V, Phi = Phi, theta_0 = init_val_SP$theta, tau_seq = tau_seq, weight = TRUE)
+```
 
 ```{r}
-
+idx_tau <- (tau_seq >= 0.4 & tau_seq <= 0.6)
 gamma_tau_hat_SP <- est_gamma(Phi[idx_tau, ], result_SP$theta)
+
+check_sp_table(true = matrix(0, nrow = (p+1), ncol = m), est = gamma_tau_hat_SP, table = TRUE, tol = 0.1^5, tau_seq = tau_seq_real)
 ```
 
-
-
 ```{r}
-zero_idx_est <- lapply(gamma_tau_hat_SP, FUN = function(x) which(abs(x) < 0.1^5, arr.ind = TRUE) %>% as_tibble) %>%
-    bind_rows (.id = "tau") %>%
-    group_by(row, col) %>%
-    summarise(zero = n(), .groups = "keep") %>%
-    filter(zero == length(gamma_tau_hat))
+library(ggplot2)
+Y_col <- factor(colnames(Y), ordered = TRUE, levels = colnames(Y))
 
-Neg <- nrow(zero_idx_est)
-Pos <- prod(dim(gamma_tau_hat[[1]])) - Neg
-
-data.frame("Positive"=Pos, "Negative" = Neg)
-
-
+lapply(gamma_tau_hat_SP, FUN = function(x) data.frame(col = rep(1:m, each = (p+1)),
+                                                   row = rep(1:(p+1), m),
+                                                   value = as.vector(x))) %>%
+  `names<-`(tau_seq_real) %>%
+  bind_rows(.id = "tau") %>%
+  mutate(is_nonzero = ifelse(abs(value) < 0.1^5, 0, 1)) %>%
+  group_by(col, row) %>%
+  summarise(is_nonzero = mean(is_nonzero)) %>%
+  ungroup() %>%
+  mutate(is_nonzero = ifelse(is_nonzero == 0, 0, 1) %>% as.character, 
+         treatment = rep(Y_col, each = p+1)) %>%
+  ggplot(aes(x = treatment, y = -row, fill = is_nonzero)) +
+  geom_tile(color = "grey") +
+  scale_fill_manual(values = c("white", "black")) + 
+  theme_bw() +
+  theme(axis.line = element_blank(),
+    panel.grid.major = element_blank(),
+    panel.grid.minor = element_blank(),
+    panel.border = element_blank(),
+    panel.background = element_blank(), 
+    axis.title.x = element_blank(), 
+    axis.text.x = element_text(angle = 90), 
+    axis.title.y = element_blank(), 
+    axis.text.y = element_blank(), 
+    axis.ticks.y = element_blank()) +
+  ggtitle(expression("S("~tau[l]~") in SP model"))
 ```
 
 ```{r}
@@ -631,635 +624,14 @@ lapply(gamma_tau_hat_SP, FUN = function(x) data.frame(col = rep(1:m, each = (p+1
   bind_rows(.id = "tau") %>%
   mutate(is_nonzero = ifelse(abs(value) < 0.1^5, 0, 1)) %>%
   group_by(col, row) %>%
-  summarise(is_nonzero = mean(is_nonzero)) %>%
-  mutate(is_nonzero = ifelse(is_nonzero == 0, 0, 1) %>% as.character) %>%
-  ggplot(aes(x = col, y = -row, fill = is_nonzero)) +
-  geom_tile(color = "grey") +
-  scale_fill_manual(values = c("white", "black")) + 
-  theme_bw() +
-  theme(axis.line = element_blank(),
-    panel.grid.major = element_blank(),
-    panel.grid.minor = element_blank(),
-    panel.border = element_blank(),
-    panel.background = element_blank(), 
-    axis.title.x = element_blank(), 
-    axis.text.x = element_blank(), 
-    axis.ticks.x = element_blank(), 
-    axis.title.y = element_blank(), 
-    axis.text.y = element_blank(), 
-    axis.ticks.y = element_blank()) +
-  ggtitle(expression("S("~tau[l]~") in SP model"))
+  summarise(is_nonzero = mean(is_nonzero), avg = mean(value)) %>%
+  ungroup() %>%
+  mutate(is_nonzero = ifelse(is_nonzero == 0, 0, 1) %>% as.character, 
+         treatment = rep(Y_col, each = p+1)) %>%
+  left_join(y = data.frame(row = 1:101, gene_ex = colnames(X)), by = "row") %>%
+  filter(row != 1, is_nonzero == 1) %>%
+  dplyr::select(-is_nonzero)
 ```
-
-
-# Prediction error
-
-
-```{r}
-PE <- rep(0, 5)
-
-set.seed(1)
-sample_idx <- sample(1:5, size = nrow(X), replace = TRUE)
-
-K <- 2
-b <- 15
-tau_seq <- seq(from = 0.35, to = 0.65, length.out = b)
-idx_tau <- idx_tau <- (tau_seq >= "0.4" & tau_seq <= "0.6")
-tau_seq_real <- tau_seq[idx_tau]
-
-knots_seq <- seq(min(tau_seq) - 0.02, max(tau_seq) + 0.02, length.out = K)
-Phi <- fda::bsplineS(tau_seq, breaks= knots_seq, norder=2, nderiv=0, returnMatrix=FALSE)
-
-for(i in 1:5) {
-  X_train <- X[sample_idx != i, ]
-  X_test <- X[sample_idx == i, ]
-  Y_train <- Y[sample_idx !=i, ]
-  Y_test <- Y[sample_idx == i, ]
-  
-  V <- calc_V(as.matrix(X_train), Phi)
-  
-  X_train <- as.matrix(X_train)
-  Y_train <- as.matrix(Y_train)
-
- lasso_coef <- matrix(nrow = p+1, ncol = m)
- for(g in 1:m) {
-   cv.lasso <- cv.glmnet(x = X_train[, -1], y = Y_train[, g], alpha = 1, type.measure = "mae")
-   lasso_model <- glmnet(X_train[, -1], Y_train[, g], family = "gaussian", alpha = 1, lambda = cv.lasso$lambda.min)
-   lasso_coef[, g] <- c(lasso_model$a0, as.vector(lasso_model$beta))
- }
-
- theta_init <- matrix(nrow = (p+1)*K, ncol = m)
- for(g in 1:m) {
-   for(j in 0:p) {
-     theta_init[((j*K)+1):((j+1)*K), g] <- lasso_coef[j+1, g]
-   }
- }
-  
- Y_modified <- Y_train - X_train%*%lasso_coef
- ridge_coef <- matrix(nrow = p+1, ncol = m)
- for(g in 1:m) {
-   cv.ridge <- cv.glmnet(x = X_train[, -1], y = Y_modified[, g], alpha = 0, type.measure = "mae")
-   ridge_model <- glmnet(X_train[, -1], Y_modified[, g], family = "gaussian", alpha = 0, lambda = cv.ridge$lambda.min)
-   ridge_coef[, g] <- c(ridge_model$a0, as.vector(ridge_model$beta))
- }
- alpha_init <- ridge_coef
- 
- init_val <- add_decomp_r(delta = 1, lambda_1 = 0.025, lambda_2 = 0.001, tol_error = 0.1^5, max_iter = 50,
-                         X = X_train, Y = Y_train, V = V, Phi = Phi, 
-                         theta_0 = theta_init, Z_0 = X_train%*%alpha_init, tau_seq = tau_seq, weight = FALSE)
-  
- log_lamb1 <- c( seq(0.9, 1.5, length.out = 10))
- lamb1_seq <- exp(log_lamb1)
-
- log_lamb2 <- c(seq(1.2, 3.2, length.out = 10))
- lamb2_seq <- exp(log_lamb2)
-
- BIC_table <- list()
-
- for(idx in 1:length(lamb1_seq)) {
-   lamb1 <- lamb1_seq[idx]
-   cl <- makeCluster(10) #not to overload your computer
-   registerDoParallel(cl) # Ready to parallel
-  
-   temp_BIC <- foreach(lamb2 = lamb2_seq, .noexport = "add_decomp") %dopar% {
-     library(dplyr)
-     library(splines)
-     library(Matrix)
-     library(glmnet)
-     library(fda)
-    
-     BIC_simul <- add_decomp_BIC(X_train, Y_train, V, Phi, theta_0 = init_val$theta, Z_0 = init_val$Z,
-                                 tau_seq, tau_seq_real, lamb1_seq = lamb1, lamb2_seq = lamb2, max_iter = 50, delta = 1)
-    BIC_simul$table
-  }
-  stopCluster(cl)
-  BIC_table[[idx]] <- temp_BIC
- }
- 
- BIC_params <- BIC_table %>% lapply(FUN = function(x) bind_rows(x)) %>%
-  bind_rows() %>%
-  mutate(LR_part = r_hat * max(1, m) / (2*n*m),  
-         LR = log(n) * LR_part, 
-         SP = log(p)*log(log(n)) * SP_part, 
-         BIC = log_Q + LR + SP) %>%
-  arrange(BIC) %>% 
-  head(1)
- 
- result <- add_decomp_r(delta = 1, lambda_1 = as.numeric(BIC_params$lambda_1), 
-                        lambda_2 = as.numeric(BIC_params$lambda_2),
-                        tol_error = 0.1^5, max_iter = 50,
-                         X = X_train, Y = Y_train, V = V, Phi = Phi, 
-                         theta_0 = init_val$theta, Z_0 = init_val$Z, tau_seq = tau_seq, weight = TRUE)
- 
- gamma_tau_hat <- est_gamma(Phi[idx_tau, ], result$theta)
- L_hat <- solve(t(X_train) %*% X_train) %*% t(X_train) %*% result$Z
-
- Y_hat_test <- mapply(FUN = function(X, L, S) X %*% L + X %*% S, X = list(X_test), L = list(L_hat),
-                      S = gamma_tau_hat, SIMPLIFY = FALSE)
- error <- mapply(FUN = function(true, est) true - est, true = list(as.matrix(Y_test)), est = Y_hat_test, 
-                 SIMPLIFY = FALSE)
- 
- PE[i] <- cal_cl_sum(error, tau_seq_real)
- print(i)
-}
-
-
-```
-
-```{r}
-PE <- rep(0, 5)
-
-set.seed(1)
-sample_idx <- sample(1:5, size = nrow(X), replace = TRUE)
-
-K <- 10
-b <- 15
-tau_seq <- seq(from = 0.35, to = 0.65, length.out = b)
-idx_tau <- idx_tau <- (tau_seq >= "0.4" & tau_seq <= "0.6")
-tau_seq_real <- tau_seq[idx_tau]
-
-knots_seq <- seq(min(tau_seq) - 0.02, max(tau_seq) + 0.02, length.out = K)
-Phi <- fda::bsplineS(tau_seq, breaks= knots_seq, norder=2, nderiv=0, returnMatrix=FALSE)
-
-for(i in 1:5) {
-  X_train <- X[sample_idx != i, ]
-  X_test <- X[sample_idx == i, ]
-  Y_train <- Y[sample_idx !=i, ]
-  Y_test <- Y[sample_idx == i, ]
-  
-  X_train <- as.matrix(X_train)
-  Y_train <- as.matrix(Y_train)
-
- ridge_coef <- matrix(nrow = p+1, ncol = m)
-  for(g in 1:m) {
-    cv.ridge <- cv.glmnet(x = X_train[, -1], y = Y_train[, g], alpha = 0, type.measure = "mae")
-    ridge_model <- glmnet(X_train[, -1], Y_train[, g], family = "gaussian", alpha = 0, 
-                          lambda = cv.ridge$lambda.min)
-    ridge_coef[, g] <- c(ridge_model$a0, as.vector(ridge_model$beta))
-  }
- first_init_LR <- ridge_coef
-  
- init_val_LR <- LR_model_r(delta = 0.1, lambda = 0.05, tol_error = 0.1^5, max_iter = 50, 
-                          X = X_train, Y = Y_train, Z_0 = X_train %*% first_init_LR, 
-                          tau_seq = tau_seq, weight = FALSE)
-  
- log_lamb <- c( seq(1, 10, length.out = 20))
- lamb_seq <- exp(log_lamb)
- BIC_simul <- LR_model_BIC(X_train, Y_train, Z_0 = init_val_LR$Z, tau_seq, tau_seq_real, lamb_seq = lamb_seq, delta = 1,
-                           max_iter = 50, r_X = 1)
-  
- BIC_params <- BIC_simul$min_BIC %>%
-   arrange(BIC_log_p) %>%
-   head(1)
-  
- result <- BIC_simul$simulation[[which(lamb_seq == BIC_params$lambda)]]
- 
- L_hat <- solve(t(X_train) %*% X_train) %*% t(X_train) %*% result$Z
-
- Y_hat_test <- X_test %*% L_hat
-   
- error <- (Y_test - Y_hat_test) %>% as.matrix
- 
- error_list <- list()
- for(l in 1:length(tau_seq_real)) {
-   error_list[[l]] <- error
- }
- 
- PE[i] <- cal_cl_sum(error_list, tau_seq_real)
- print(i)
-}
-
-```
-
-```{r}
-PE <- rep(0, 5)
-
-set.seed(1)
-sample_idx <- sample(1:5, size = nrow(X), replace = TRUE)
-
-K <- 2
-b <- 15
-tau_seq <- seq(from = 0.35, to = 0.65, length.out = b)
-idx_tau <- idx_tau <- (tau_seq >= "0.4" & tau_seq <= "0.6")
-tau_seq_real <- tau_seq[idx_tau]
-
-knots_seq <- seq(min(tau_seq) - 0.02, max(tau_seq) + 0.02, length.out = K)
-Phi <- fda::bsplineS(tau_seq, breaks= knots_seq, norder=2, nderiv=0, returnMatrix=FALSE)
-
-for(i in 1:5) {
-  X_train <- X[sample_idx != i, ]
-  X_test <- X[sample_idx == i, ]
-  Y_train <- Y[sample_idx !=i, ]
-  Y_test <- Y[sample_idx == i, ]
-  
-  V <- calc_V(as.matrix(X_train), Phi)
-  
-  X_train <- as.matrix(X_train)
-  Y_train <- as.matrix(Y_train)
-
- lasso_coef <- matrix(nrow = p+1, ncol = m)
- for(g in 1:m) {
-   cv.lasso <- cv.glmnet(x = X_train[, -1], y = Y_train[, g], alpha = 1, type.measure = "mae")
-   lasso_model <- glmnet(X_train[, -1], Y_train[, g], family = "gaussian", alpha = 1, lambda = cv.lasso$lambda.min)
-   lasso_coef[, g] <- c(lasso_model$a0, as.vector(lasso_model$beta))
- }
-  
-  first_init_SP <- matrix(nrow = (p+1)*K, ncol = m)
-  for(g in 1:m) {
-    for(j in 0:p) {
-      first_init_SP[((j*K)+1):((j+1)*K), g] <- lasso_coef[j+1, g]
-    }
-  }
-
- init_val_SP <- SP_model_r(delta = 1, lambda = 0.001, tol_error = 0.1^5, max_iter = 50, 
-                          X = X_train, Y = Y_train, V = V, Phi = Phi, theta_0 = first_init_SP, 
-                          tau_seq = tau_seq, weight = FALSE)
- 
- lamb_seq <- seq(3, 100, length.out = 20)
- BIC_table <- list()
-
-cl <- makeCluster(20) #not to overload your computer
-registerDoParallel(cl) # Ready to parallel
-  
-BIC_table <- foreach(lambda = lamb_seq, .noexport = "add_decomp") %dopar% {
-  library(dplyr)
-  library(splines)
-  library(Matrix)
-  library(Rcpp)
-  library(glmnet)
-  library(fda)
-    
-  BIC_simul <- SP_model_BIC(X_train, Y_train, V, Phi, theta_0 = init_val_SP$theta, 
-                            tau_seq, tau_seq_real, lamb_seq = lambda, max_iter = 50, delta = 1)
-    BIC_simul$min_BIC
-  }
-stopCluster(cl)
- 
- BIC_params <- BIC_table %>%
-  bind_rows() %>%
-  arrange(BIC_log_p) %>%
-  head(1)
-
- result <- SP_model_r(delta = 1, lambda = as.numeric(BIC_params$lambda), tol_error = 0.1^5, max_iter = 50, 
-                          X = X_train, Y = Y_train, V = V, Phi = Phi, theta_0 = init_val_SP$theta, tau_seq = tau_seq, weight = TRUE)
- 
- gamma_tau_hat <- est_gamma(Phi[idx_tau, ], result$theta)
-
- Y_hat_test <- mapply(FUN = function(X, S) X %*% S, X = list(X_test),
-                      S = gamma_tau_hat, SIMPLIFY = FALSE)
- error <- mapply(FUN = function(true, est) true - est, true = list(as.matrix(Y_test)), est = Y_hat_test, 
-                 SIMPLIFY = FALSE)
- 
- PE[i] <- cal_cl_sum(error, tau_seq_real)
- print(i)
-}
-
-```
-
-
-
-
-
-
-# Low-rank Model
-
-## Initial value
-
-
-```{r}
-X <- as.matrix(X)
-Y <- as.matrix(Y)
-
-
-ridge_coef <- matrix(nrow = p+1, ncol = m)
-for(g in 1:m) {
-  cv.ridge <- cv.glmnet(x = X[, -1], y = Y[, g], alpha = 0, type.measure = "mae")
-  ridge_model <- glmnet(X[, -1], Y[, g], family = "gaussian", alpha = 0, 
-                        lambda = cv.ridge$lambda.min)
-  ridge_coef[, g] <- c(ridge_model$a0, as.vector(ridge_model$beta))
-}
-first_init_LR <- ridge_coef
-  
-init_val_LR <- LR_model_r(delta = 1, lambda = 0.05, tol_error = 0.1^5, max_iter = 50, 
-                          X = X, Y = Y, Z_0 = X %*% first_init_LR, tau_seq = tau_seq, weight = FALSE)
-
-log_lamb <- c( seq(1, 10, length.out = 20))
-lamb_seq <- exp(log_lamb)
-
-BIC_simul <- LR_model_BIC(X, Y, Z_0 = init_val_LR$Z, tau_seq, tau_seq_real, delta = 1, lamb_seq, max_iter = 50, r_X = 1)
-  
-BIC_params <- BIC_simul$min_BIC %>%
-    arrange(BIC_log_p) %>%
-    head(1)
-  
-result <- BIC_simul$simulation[[which(lamb_seq == BIC_params$lambda)]]
-  
-```
-
-
-
-
-# Sparse Model
-
-## Initial value
-
-```{r}
-X <- as.matrix(X)
-Y <- as.matrix(Y)
-
- lasso_coef <- matrix(nrow = p+1, ncol = m)
-  for(g in 1:m) {
-    cv.lasso <- cv.glmnet(x = X[, -1], y = Y[, g], alpha = 1, type.measure = "mae")
-    lasso_model <- glmnet(X[, -1], Y[, g], family = "gaussian", alpha = 1, lambda = cv.lasso$lambda.min)
-    lasso_coef[, g] <- c(lasso_model$a0, as.vector(lasso_model$beta))
-  }
-  
-  first_init_SP <- matrix(nrow = (p+1)*K, ncol = m)
-  for(g in 1:m) {
-    for(j in 0:p) {
-      first_init_SP[((j*K)+1):((j+1)*K), g] <- lasso_coef[j+1, g]
-    }
-  }
-  
-  init_val_SP <- SP_model_r(delta = 1, lambda = 0.001, tol_error = 0.1^5, max_iter = 50, 
-                          X = X, Y = Y, V = V, Phi = Phi, theta_0 = first_init_SP, tau_seq = tau_seq, weight = FALSE)
-```
-
-```{r}
-gamma_tau_hat <- est_gamma(Phi[idx_tau, ], init_val_SP$theta)
-
-zero_idx_est <- lapply(gamma_tau_hat, FUN = function(x) which(abs(x) < 0.1^5, arr.ind = TRUE) %>% as_tibble) %>%
-    bind_rows (.id = "tau") %>%
-    group_by(row, col) %>%
-    summarise(zero = n(), .groups = "keep") %>%
-    filter(zero == length(gamma_tau_hat))
-
-Neg <- nrow(zero_idx_est)
-Pos <- prod(dim(gamma_tau_hat[[1]])) - Neg
-
-data.frame("Positive"=Pos, "Negative" = Neg)
-
-
-```
-
-
-
-```{r}
-lamb_seq <- seq(3, 100, length.out = 20)
-
-BIC_table <- list()
-
-cl <- makeCluster(20) #not to overload your computer
-registerDoParallel(cl) # Ready to parallel
-  
-BIC_table <- foreach(lambda = lamb_seq, .noexport = "add_decomp") %dopar% {
-  library(dplyr)
-  library(splines)
-  library(Matrix)
-  library(Rcpp)
-  library(glmnet)
-  library(fda)
-    
-  BIC_simul <- SP_model_BIC(X, Y, V, Phi, theta_0 = init_val_SP$theta, 
-                            tau_seq, tau_seq_real, delta = 1,lamb_seq = lambda, max_iter = 50)
-    BIC_simul$min_BIC
-  }
-stopCluster(cl)
-  
-BIC_table %>%
-  bind_rows() %>%
-  arrange(BIC_log_p) %>%
-  head(6)
-
-
-
-```
-
-
-```{r}
-result <- SP_model_r(delta = 1, lambda = 79.5989, tol_error = 0.1^5, max_iter = 50, 
-                          X = X, Y = Y, V = V, Phi = Phi, theta_0 = init_val_SP$theta, tau_seq = tau_seq, weight = TRUE)
-```
-
-
-# Check loss sum
-
-$$\sum_\ell^{b}\sum_{g=1}^m\sum_{i=1}^n\frac{1}{n}\rho_\tau(Y_i^{(g)}-x_i^T[\alpha^{(g)}+\gamma^{(g)}(\tau)])\\=\sum_\ell^{b}\sum_{g=1}^m\sum_{i=1}^n\frac{1}{n}\rho_\tau(e_i^{(\ell)(g)})$$
-
-```{r}
-gamma_tau_hat <- est_gamma(Phi[idx_tau, ], result$theta)
-L_hat <- solve(t(X_train) %*% X_train) %*% t(X_train) %*% result$Z
-
-Y_hat_test <- mapply(FUN = function(X, L, S) X %*% L + X %*% S, X = list(X_test), L = list(L_hat)
-                     , S = gamma_tau_hat, SIMPLIFY = FALSE)
-error <- mapply(FUN = function(true, est) true - est, true = list(as.matrix(Y_test)), est = Y_hat_test, SIMPLIFY = FALSE)
-
-cal_cl_sum(error, tau_seq_real)
-```
-
-
-
-
-```{r}
-cal_cl_sum(result$e, tau_seq)
-```
-
-```{r}
-est_beta <- lapply(gamma_hat, FUN = function(x) x + result$alpha)
-est_e <- lapply(est_beta, FUN = function(x) as.matrix(Y) - X %*% x)
-
-cal_cl_sum(est_e, tau_seq)
-  
-```
-
-
-
-```{r}
-Y_list <- list()
-for(i in 1:length(tau_seq)) {
-  Y_list[[i]] <- as.matrix(Y)
-}
-
-cal_cl_sum(Y_list, tau_seq)
-```
-
-
-
-
-# various lambda_1
-
-```{r}
-lamb_1_seq <- seq(from = 0, to = 0.05, by = 0.01) %>% c(seq(from = 0.1, to = 1, by = 0.1), 2, 4, 6)
-simul_lamb1 <- list()
-
-for(idx in 1:length(lamb_1_seq)) {
-  simul_lamb1[[idx]] <- add_decomp(delta = 1, lambda_1 = lamb_1_seq[idx], lambda_2 = 1.5,
-                                   tol_error = 0.1, max_iter = 300, 
-                                   X = as.matrix(X), Y = as.matrix(Y), V = V, Phi = Phi)
-  if((idx %% 2) == 1) print(paste0("iter = ", idx))
-}
-```
-
-```{r}
-alpha_hat <- simul_lamb1 %>% lapply(FUN = function(x) x$alpha)
-
-lapply(alpha_hat, FUN = function(x) svd(x) %>% .$d) %>%
-  lapply(FUN = function(x) data.frame("ratio" = (sum(x[1])/sum(x)), rank = sum(abs(x) > 0.1^5))) %>%
-  `names<-`(value = lamb_1_seq) %>%
-  bind_rows(.id = "lambda1") %>%
-  ggplot() +
-  geom_line(aes(x = lambda1, y = ratio, group = 1)) +
-  labs(title = expression("1st singular value / sum of singular values "~lambda[2]~"=1.5 "~delta~"=1, max iter = 300")) +
-  xlab(label = expression(lambda[1]))
-```
-
-
-```{r}
-simul_lamb1 %>% lapply(FUN = function(x) x$theta %>% est_gamma(Phi = Phi, theta = .) %>% .[[3]]) %>%
-  lapply(FUN = function(x) svd(x) %>% .$d) %>%
-  lapply(FUN = function(x) data.frame(sigma_1 = x[1], sigma_2 = x[2], sigma_3 = x[3], 
-                                      ratio = sum(x[1:3])/sum(x))) %>%
-  `names<-`(value = lamb_1_seq) %>%
-  bind_rows(.id = "lambda_1")
-```
-
-
-```{r}
-alpha_hat %>%
-  lapply(FUN = function(x) svd(x) %>% .$d %>% .[1:2] ) %>%
-  lapply(FUN = function(x) data.frame(t(x))) %>%
-  `names<-`(value = lamb_1_seq) %>%
-  bind_rows(.id = "lambda_1") %>%
-  `names<-`(value = c("lambda_1", "first", "second")) %>%
-  gather(data = ., key = "sing_val", value = value, -lambda_1) %>%
-  ggplot() +
-  geom_line(aes(x = lambda_1, y = value, group = sing_val, color = sing_val)) +
-  facet_wrap(~sing_val, scales = "free_y") +
-  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
-```
-
-
-
-# various lambda_2
-
-```{r}
-lamb_2_seq <- c(seq(from = 0.1, to = 2, by = 0.1), seq(2.5, 5, by = 0.5))
-simul_lamb2 <- list()
-
-for(idx in 1:length(lamb_2_seq)) {
-  simul_lamb2[[idx]] <- add_decomp(delta = 1, lambda_1 = 1, lambda_2 = lamb_2_seq[idx],
-                                   tol_error = 0.1, max_iter = 300, 
-                                   X = as.matrix(X), Y = as.matrix(Y), V = V, Phi = Phi)
-  if((idx %% 2) == 1) print(paste0("iter = ", idx))
-}
-```
-
-
-
-```{r}
-cal_zero <- function(gamma, b) {
-  data <- lapply(gamma, FUN = function(x) which(abs(x) < 0.1^5, arr.ind = TRUE) %>% as_tibble) %>%
-  `names<-`(value= tau_seq) %>%
-  bind_rows(.id = "tau") %>% 
-  group_by(row, col) %>%
-    summarise(zero = n()) %>%
-    filter(zero == b)
-  return(nrow(data))
-}
-```
-
-```{r}
-gamma_hat <- simul_lamb2 %>%
-  lapply(FUN = function(x) x$theta) %>%
-  lapply(FUN = function(x) est_gamma(Phi = Phi, theta = x))
-
-gamma_hat %>%
-  lapply(FUN = function(x) cal_zero(gamma = x, b = b) %>% data.frame(zero_count = .)) %>%
-  `names<-`(value = lamb_2_seq) %>%
-  bind_rows(.id = "lambda_2") %>%
-  mutate(ratio = zero_count/((p+1)*m)) %>%
-  ggplot() +
-  geom_line(aes(x = lambda_2, y = ratio, group = 1)) +
-  xlab(label = expression(lambda[2])) +
-  labs(title = expression("# of zero entry/total entry"~lambda[1]~"=1, "~delta~"=1, max iter = 300"))
-```
-
-```{r}
-extr_e <- simul_lamb2 %>%
-  lapply(FUN = function(x) x$e) 
-
-cl_sum <- list()
-for(i in 1:length(lamb_2_seq)) {
-  cl_sum[[i]] <- data.frame(cl_sum = cal_cl_sum(e = extr_e[[i]], tau_seq = tau_seq))
-}
-```
-
-```{r}
-cl_sum %>%
-  `names<-`(value = lamb_2_seq) %>%
-  bind_rows(.id = "lambda_2") %>%
-  ggplot() +
-  geom_line(aes(x = lambda_2, y = cl_sum, group = 1))
-```
-
-
-# Two way
-
-```{r}
-lamb_1_seq <- seq(from = 0.25, to = 2, by = 0.25)
-lamb_2_seq <- seq(from = 0.25, to = 2, by = 0.25)
-
-
-simul_2_way <- list()
-for(idx_1 in 1:length(lamb_1_seq)) {
-  simul_2_way[[idx_1]] <- list()
-  for(idx_2 in 1:length(lamb_2_seq)) {
-    simul_2_way[[idx_1]][[idx_2]] <- add_decomp(delta = 1, lambda_1 = lamb_1_seq[idx_1], 
-                                                lambda_2 = lamb_2_seq[idx_2], tol_error = 0.1, 
-                                                max_iter = 300, X = as.matrix(X), Y = as.matrix(Y), 
-                                                V = V, Phi = Phi)
-  }
-}
-```
-
-
-```{r}
-simul_2_way %>%
-  lapply(FUN = function(x) lapply(x, FUN = function(y) cal_cl_sum(e = y$e, tau_seq = tau_seq) %>% data.frame(cl_sum = .))) %>%
-  lapply(FUN = function(x) x %>% `names<-`(value= lamb_2_seq) %>% bind_rows(.id = "lambda_2")) %>%
-  `names<-`(value = lamb_1_seq) %>%
-  bind_rows(.id = "lambda_1") %>%
-  ggplot() +
-  geom_tile(aes(x = lambda_1, y = lambda_2, fill = cl_sum)) +
-  labs(title = "check loss sum when max iter = 300")
-```
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 
