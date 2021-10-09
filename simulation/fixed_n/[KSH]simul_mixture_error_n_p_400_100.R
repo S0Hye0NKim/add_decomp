@@ -1,7 +1,8 @@
-# Simulation with normal error
+# Simulation with mixture error
 rm(list = ls())
 
 library(dplyr)
+library(splines)
 library(Matrix)
 library(foreach)
 library(doParallel)
@@ -9,25 +10,26 @@ library(Rcpp)
 library(glmnet)
 library(fda)
 library(expm)
-library(LaplacesDemon)
 
 sourceCpp("[KSH]add_decomp_function.cpp")
 source("https://raw.githubusercontent.com/S0Hye0NKim/add_decomp/master/functions/add_decomp_function.R")
 
+
+# 1. low dim : (n,p) = (400, 100)
 
 #################
 ## 1-0. Set up ##
 #################
 
 ## Generate data
-set.seed(3)
+set.seed(1)
 n <- 400
 m <- 10
-p <- 800
+p <- 100
 b <- 15
 num_rank <- 3
-num_rank_X <- 300
-simul_times <- 33
+num_rank_X <- 30
+simul_times <- 50
 
 sigma_mat <- matrix(nrow = p, ncol = p)
 for(j in 1:p) {
@@ -53,15 +55,16 @@ LR_mat <- L1 %*% t(L2)
 X_list <- list()
 eps_list <- list()
 
-set.seed(2)
 for(simul in 1:simul_times) {
   X1 <- matrix(rnorm(n*num_rank_X, mean = 0, sd = 1), nrow = n)
   X2 <- matrix(rnorm(p*num_rank_X, mean = 0, sd = 1), nrow = p)
   X <- X1 %*% t(X2) 
   X_list[[simul]] <- X %*% expm::sqrtm(sigma_mat) %>% cbind(rep(1, n), .)
   
-  sigma <- runif(n*m,0.4, 0.7)
-  eps_entry <- sapply(sigma, FUN = function(x) LaplacesDemon::rlaplace(1, location = 0, scale = x))
+  components <- sample(1:2, size = n*m, replace = TRUE)
+  mus <- c(0, 1)
+  
+  eps_entry <- rnorm(n = n*m, mean = mus[components], sd = 1)
   eps_list[[simul]] <- matrix(eps_entry, nrow = n, ncol = m)
 }
 
@@ -84,50 +87,76 @@ for(simul in 1:simul_times) {
   V_list[[simul]] <- calc_V(X_list[[simul]], Phi)
 }
 
-##################################
-## 1-1. Simulation - add_decomp ##
-##################################
+#########################
+## First Initial value ##
+#########################
+init_val_AD <- list()
+init_val_LR <- list()
+init_val_SP <- list()
 
-simul_high_add_decomp_2 <- vector("list", length = simul_times)
 for(simul in 1:simul_times) {
+    X <- X_list[[simul]]
+    Y <- Y_list[[simul]]
+    V <- V_list[[simul]]
+
+    lasso_coef <- matrix(nrow = p+1, ncol = m)
+    for(g in 1:m) {
+        cv.lasso <- cv.glmnet(x = X[, -1], y = Y[, g], alpha = 1, type.measure = "mae")
+        lasso_model <- glmnet(X[, -1], Y[, g], family = "gaussian", alpha = 1, lambda = cv.lasso$lambda.min)
+        lasso_coef[, g] <- c(lasso_model$a0, as.vector(lasso_model$beta))
+    }
   
-  tau_seq <- seq(from = 0.35, to = 0.65, length.out = b)
+    first_init_SP <- matrix(nrow = (p+1)*K, ncol = m)
+    for(g in 1:m) {
+        for(j in 0:p) {
+        first_init_SP[((j*K)+1):((j+1)*K), g] <- lasso_coef[j+1, g]
+        }
+    }
+  
+    init_val_SP[[simul]] <- SP_model_r(delta = 1, lambda = 0.01, tol_error = 0.1^5, max_iter = 50, 
+                            X = X, Y = Y, V = V, Phi = Phi, theta_0 = first_init_SP, tau_seq = tau_seq, weight = FALSE)
+
+    Y_modified <- Y - X%*%lasso_coef
+    ridge_coef_AD <- matrix(nrow = p+1, ncol = m)
+    for(g in 1:m) {
+        cv.ridge <- cv.glmnet(x = X[, -1], y = Y_modified[, g], alpha = 0, type.measure = "mae")
+        ridge_model <- glmnet(X[, -1], Y_modified[, g], family = "gaussian", alpha = 0, lambda = cv.ridge$lambda.min)
+        ridge_coef_AD[, g] <- c(ridge_model$a0, as.vector(ridge_model$beta))
+    }
+    alpha_init <- ridge_coef_AD
+
+
+    init_val_AD[[simul]] <- add_decomp_r(delta = 1, lambda_1 = 0.01, lambda_2 = 0.001, tol_error = 0.1^5, max_iter = 50,
+                                       X = X, Y = Y, V = V, Phi = Phi, 
+                                       theta_0 = init_val_SP[[simul]]$theta, Z_0 = X%*%alpha_init, tau_seq = tau_seq, weight = FALSE)
+    
+    ridge_coef_LR <- matrix(nrow = p+1, ncol = m)
+    for(g in 1:m) {
+        cv.ridge <- cv.glmnet(x = X[, -1], y = Y[, g], alpha = 0, type.measure = "mae")
+        ridge_model <- glmnet(X[, -1], Y[, g], family = "gaussian", alpha = 0, lambda = cv.ridge$lambda.min)
+        ridge_coef_LR[, g] <- c(ridge_model$a0, as.vector(ridge_model$beta))
+    }
+  first_init_LR <- ridge_coef_LR
+  
+  init_val_LR[[simul]] <- LR_model(delta = 1, lambda = 1, tol_error = 0.1^5, max_iter = 50, 
+                            X = X, Y = Y, Z_0 = X %*% first_init_LR, tau_seq = tau_seq, weight = FALSE)
+}
+
+
+##################################
+## 1. Additive decomposed model ##
+##################################
+simul_add_decomp <- vector("list", length = simul_times)
+for(simul in 1:simul_times) {
+
   X <- X_list[[simul]]
   Y <- Y_list[[simul]]
   V <- V_list[[simul]]
+  init_val <- init_val_AD[[simul]]
   
-  lasso_coef <- matrix(nrow = p+1, ncol = m)
-  for(g in 1:m) {
-    cv.lasso <- cv.glmnet(x = X[, -1], y = Y[, g], 
-                          alpha = 1, type.measure = "mae")
-    lasso_model <- glmnet(X[, -1], Y[, g], 
-                          family = "gaussian", alpha = 1, lambda = 0.01)
-    lasso_coef[, g] <- c(lasso_model$a0, as.vector(lasso_model$beta))
-  }
-  
-  theta_init <- matrix(nrow = (p+1)*K, ncol = m)
-  for(g in 1:m) {
-    for(j in 0:p) {
-      theta_init[((j*K)+1):((j+1)*K), g] <- lasso_coef[j+1, g]
-    }
-  }
-  
-  Y_modified <- Y - X%*%lasso_coef
-  ridge_coef <- matrix(nrow = p+1, ncol = m)
-  for(g in 1:m) {
-    cv.ridge <- cv.glmnet(x = X[, -1], y = Y_modified[, g], alpha = 0, type.measure = "mae")
-    ridge_model <- glmnet(X[, -1], Y_modified[, g], family = "gaussian", alpha = 0, lambda = cv.ridge$lambda.min)
-    ridge_coef[, g] <- c(ridge_model$a0, as.vector(ridge_model$beta))
-  }
-  alpha_init <- ridge_coef
-  
-  init_val <- add_decomp(delta = 1, lambda_1 = 0.01, lambda_2 = 0.001, tol_error = 0.1^5, max_iter = 50,
-                         X = X, Y = Y, V = V, Phi = Phi, 
-                         theta_0 = theta_init, Z_0 = X%*%alpha_init, tau_seq = tau_seq, weight = FALSE)
-  
-  log_lamb1 <- c( seq(-3, 0.2, length.out = 20))
+  log_lamb1 <- c( seq(-2, -0.42, length.out = 20))
   lamb1_seq <- exp(log_lamb1)
-  log_lamb2 <- c(seq(4, 6.5, length.out = 20))
+  log_lamb2 <- c(seq(6, 6.3, length.out = 20))
   lamb2_seq <- exp(log_lamb2)
   
   BIC_table <- list()
@@ -167,44 +196,34 @@ for(simul in 1:simul_times) {
     arrange(BIC) %>%  
     head(1)
   
-  result <- add_decomp(delta = 1, lambda_1 = BIC_params$lambda_1, lambda_2 = BIC_params$lambda_2, 
+  result <- add_decomp_r(delta = 1, lambda_1 = BIC_params$lambda_1, lambda_2 = BIC_params$lambda_2, 
                        tol_error = 0.1^5, max_iter = 50, X, Y, V, Phi, 
                        theta_0 = init_val$theta, Z_0 = init_val$Z, tau_seq = tau_seq, weight = TRUE)
   
-  simul_high_add_decomp_2[[simul]] <- result
+  simul_add_decomp[[simul]] <- result
 }
 
-################################
-## 1-2. Simulation - LR_model ##
-################################
 
-cl <- makeCluster(10) #not to overload your computer
+#######################
+## 2. Low-rank Model ##
+#######################
+
+cl <- makeCluster(20) #not to overload your computer
 registerDoParallel(cl) # Ready to parallel
-simul_high_LR_model_2 <- foreach(simul = 1:simul_times, .noexport = "add_decomp") %dopar% {
+simul_LR_model <- foreach(simul = 1:simul_times, .noexport = "add_decomp") %dopar% {
   library(dplyr)
   library(splines)
   library(Matrix)
   library(glmnet)
   library(fda)
   
-  tau_seq <- seq(from = 0.35, to = 0.65, length.out = b)
   X <- X_list[[simul]]
   Y <- Y_list[[simul]]
+  init_val <- init_val_LR[[simul]]
   
-  ridge_coef <- matrix(nrow = p+1, ncol = m)
-  for(g in 1:m) {
-    cv.ridge <- cv.glmnet(x = X[, -1], y = Y[, g], alpha = 0, type.measure = "mae")
-    ridge_model <- glmnet(X[, -1], Y[, g], family = "gaussian", alpha = 0, lambda = cv.ridge$lambda.min)
-    ridge_coef[, g] <- c(ridge_model$a0, as.vector(ridge_model$beta))
-  }
-  first_init_LR <- ridge_coef
-  
-  init_val_LR <- LR_model_r(delta = 1, lambda = 100, tol_error = 0.1^5, max_iter = 50, 
-                            X = X, Y = Y, Z_0 = X %*% first_init_LR, tau_seq = tau_seq, weight = FALSE)
-  
-  lamb_seq <- seq(0.1, 1, length.out = 25)
+  lamb_seq <- seq(0.1, 1, length.out = 20)
   r_X <- rankMatrix(X[, -1])
-  BIC_simul <- LR_model_BIC(X, Y, Z_0 = init_val_LR$Z, tau_seq, tau_seq_real, lamb_seq, max_iter = 50, delta = 1, r_X = rankMatrix(X[, -1]))
+  BIC_simul <- LR_model_BIC(X, Y, Z_0 = init_val$Z, tau_seq, tau_seq_real, lamb_seq, max_iter = 50, delta = 1, r_X = rankMatrix(X[, -1]))
   
   BIC_params <- BIC_simul$min_BIC %>%
     arrange(BIC_log_p) %>%
@@ -218,36 +237,18 @@ simul_high_LR_model_2 <- foreach(simul = 1:simul_times, .noexport = "add_decomp"
 stopCluster(cl)
 
 
-################################
-## 1-3. Simulation - SP_model ##
-################################
-
-simul_high_SP_model_2 <- vector("list", length = simul_times)
+#####################
+## 3. Sparse Model ##
+#####################
+simul_SP_model <- vector("list", length = simul_times)
 for(simul in 1:simul_times) {
   
-  tau_seq <- seq(from = 0.35, to = 0.65, length.out = b)
   X <- X_list[[simul]]
   Y <- Y_list[[simul]]
   V <- V_list[[simul]]
+  init_val <- init_val_SP[[simul]]
   
-  lasso_coef <- matrix(nrow = p+1, ncol = m)
-  for(g in 1:m) {
-    cv.lasso <- cv.glmnet(x = X[, -1], y = Y[, g], alpha = 1, type.measure = "mae")
-    lasso_model <- glmnet(X[, -1], Y[, g], family = "gaussian", alpha = 1, lambda = cv.lasso$lambda.min)
-    lasso_coef[, g] <- c(lasso_model$a0, as.vector(lasso_model$beta))
-  }
-  
-  first_init_SP <- matrix(nrow = (p+1)*K, ncol = m)
-  for(g in 1:m) {
-    for(j in 0:p) {
-      first_init_SP[((j*K)+1):((j+1)*K), g] <- lasso_coef[j+1, g]
-    }
-  }
-  
-  init_val_SP <- SP_model(delta = 1, lambda = 0.05, tol_error = 0.1^5, max_iter = 50, 
-                          X = X, Y = Y, V = V, Phi = Phi, theta_0 = first_init_SP, tau_seq = tau_seq, weight = FALSE)
-  
-  log_lamb <- c(seq(4, 6.5, length.out = 20))
+  log_lamb <- c(seq(1, 6.3, length.out = 20))
   lamb_seq <- exp(log_lamb)
   
   BIC_table <- list()
@@ -263,7 +264,7 @@ for(simul in 1:simul_times) {
     library(Rcpp)
     sourceCpp("[KSH]add_decomp_function.cpp")
     
-    BIC_simul <- SP_model_BIC(X, Y, V, Phi, theta_0 = init_val_SP$theta, 
+    BIC_simul <- SP_model_BIC(X, Y, V, Phi, theta_0 = init_val$theta, 
                               tau_seq, tau_seq_real, lamb_seq = lambda, max_iter = 50, delta = 1, fun_type = "cpp")
     BIC_simul$BIC_data
   }
@@ -275,9 +276,9 @@ for(simul in 1:simul_times) {
     mutate_all(as.numeric) %>%
     head(1)
   
-  result <- SP_model(delta = 1, lambda = BIC_params$lambda, tol_error = 0.1^5, max_iter = 50, 
-                     X = X, Y = Y, V = V, Phi = Phi, theta_0 = init_val_SP$theta, tau_seq = tau_seq, weight = TRUE)
-  simul_high_SP_model_2[[simul]] <- result
+  result <- SP_model_r(delta = 1, lambda = BIC_params$lambda, tol_error = 0.1^5, max_iter = 50, 
+                     X = X, Y = Y, V = V, Phi = Phi, theta_0 = init_val$theta, tau_seq = tau_seq, weight = TRUE)
+  simul_SP_model[[simul]] <- result
 }
 
 
@@ -285,6 +286,5 @@ for(simul in 1:simul_times) {
 ## Save Data ##
 ###############
 
-save(simul_high_add_decomp_2, simul_high_LR_model_2, simul_high_SP_model_2, 
-     LR_mat, sp_mat, Phi, tau_seq, tau_seq_real, X_list, file = "ksh_simul_laplace_error_high_2.RData")
-
+save(simul_add_decomp, simul_LR_model, simul_SP_model, est_gamma, check_sp_table, 
+     LR_mat, sp_mat, Phi, tau_seq, tau_seq_real, X_list, file = "ksh_simul_mixture_error_n_p_400_100.RData")
