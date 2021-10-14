@@ -32,6 +32,8 @@ All the functions used in the proposed algorithm are located in the directory "[
 
 All the codes used in simulation are located in the directory "[**simulation**](https://github.com/S0Hye0NKim/add_decomp/tree/master/simulation)"
 
+All the codes used in CCLE analysis are located in the directory "[**CCLE**](https://github.com/S0Hye0NKim/add_decomp/tree/master/CCLE)"
+
 ---
 ## Version information
 
