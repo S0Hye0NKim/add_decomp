@@ -29,7 +29,7 @@ p <- 200
 b <- 15
 num_rank <- 3
 num_rank_X <- 100
-simul_times <- 100
+simul_times <- 50
 
 sigma_mat <- matrix(nrow = p, ncol = p)
 for(j in 1:p) {
@@ -140,7 +140,7 @@ for(simul in 1:simul_times) {
         }
     }
   
-    init_val_SP[[simul]] <- SP_model_r(delta = 1, lambda = 20, tol_error = 0.1^5, max_iter = 50, 
+    init_val_SP[[simul]] <- SP_model_r(delta = 1, lambda = 1, tol_error = 0.1^5, max_iter = 50, 
                             X = X, Y = Y, V = V, Phi = Phi, theta_0 = first_init_SP, tau_seq = tau_seq, weight = FALSE)
 
     lasso_coef <- matrix(nrow = p+1, ncol = m)
@@ -190,9 +190,9 @@ for(simul in 1:simul_times) {
   V <- V_list[[simul]]
   init_val <- init_val_AD[[simul]]
   
-  log_lamb1 <- c( seq(5.6, 6.5, length.out = 20))
+  log_lamb1 <- c( seq(6, 6.5, length.out = 20))
   lamb1_seq <- exp(log_lamb1)
-  log_lamb2 <- c(seq(4, 6, length.out = 20))
+  log_lamb2 <- c(seq(5.65, 6, length.out = 20))
   lamb2_seq <- exp(log_lamb2)
   
   BIC_table <- list()
@@ -284,7 +284,7 @@ for(simul in 1:simul_times) {
   V <- V_list[[simul]]
   init_val <- init_val_SP[[simul]]
   
-  log_lamb <- c(seq(4, 6.5, length.out = 20))
+  log_lamb <- c(seq(4, 6, length.out = 20))
   lamb_seq <- exp(log_lamb)
   
   BIC_table <- list()
@@ -316,6 +316,10 @@ for(simul in 1:simul_times) {
                      X = X, Y = Y, V = V, Phi = Phi, theta_0 = init_val$theta, tau_seq = tau_seq, weight = TRUE)
   simul_SP_model[[simul]] <- result
 }
+
+###############
+## Save Data ##
+###############
 
 save(simul_add_decomp, simul_LR_model, simul_SP_model, est_gamma, 
      LR_mat, sp_mat, Phi, tau_seq, tau_seq_real, X_list, file = "ksh_simul_location_scale_n_p_400_200.RData")

@@ -29,7 +29,7 @@ p <- 200
 b <- 15
 num_rank <- 3
 num_rank_X <- 100
-simul_times <- 100
+simul_times <- 50
 
 sigma_mat <- matrix(nrow = p, ncol = p)
 for(j in 1:p) {
@@ -140,7 +140,7 @@ for(simul in 1:simul_times) {
         }
     }
   
-    init_val_SP[[simul]] <- SP_model_r(delta = 1, lambda = 20, tol_error = 0.1^5, max_iter = 50, 
+    init_val_SP[[simul]] <- SP_model_r(delta = 1, lambda = 1, tol_error = 0.1^5, max_iter = 50, 
                             X = X, Y = Y, V = V, Phi = Phi, theta_0 = first_init_SP, tau_seq = tau_seq, weight = FALSE)
 
     lasso_coef <- matrix(nrow = p+1, ncol = m)
@@ -162,7 +162,7 @@ for(simul in 1:simul_times) {
     alpha_init <- ridge_coef_AD
 
 
-    init_val_AD[[simul]] <- add_decomp_r(delta = 1, lambda_1 = 15, lambda_2 = 0.001, tol_error = 0.1^5, max_iter = 50,
+    init_val_AD[[simul]] <- add_decomp_r(delta = 1, lambda_1 = 1, lambda_2 = 0.01, tol_error = 0.1^5, max_iter = 50,
                                        X = X, Y = Y, V = V, Phi = Phi, 
                                        theta_0 = init_val_SP[[simul]]$theta, Z_0 = X%*%alpha_init, tau_seq = tau_seq, weight = FALSE)
     
@@ -190,9 +190,9 @@ for(simul in 1:simul_times) {
   V <- V_list[[simul]]
   init_val <- init_val_AD[[simul]]
   
-  log_lamb1 <- c( seq(3, 4, length.out = 20))
+  log_lamb1 <- c( seq(6.5, 7, length.out = 20))
   lamb1_seq <- exp(log_lamb1)
-  log_lamb2 <- c(seq(5.83, 6.2, length.out = 20))  # exp(5.8) start -> TP 100, TN 100
+  log_lamb2 <- c(seq(5.72, 6.2, length.out = 20))  # exp(5.8) start -> TP 100, TN 100
   lamb2_seq <- exp(log_lamb2)
   
   BIC_table <- list()
@@ -231,7 +231,7 @@ for(simul in 1:simul_times) {
     filter(S_hat_net != 0) %>%
     arrange(BIC) %>%  
     head(1)
-
+  
   result <- add_decomp_r(delta = 1, lambda_1 = BIC_params$lambda_1, lambda_2 = BIC_params$lambda_2, 
                        tol_error = 0.1^5, max_iter = 50, X, Y, V, Phi, 
                        theta_0 = init_val$theta, Z_0 = init_val$Z, tau_seq = tau_seq, weight = TRUE)
@@ -284,7 +284,7 @@ for(simul in 1:simul_times) {
   V <- V_list[[simul]]
   init_val <- init_val_SP[[simul]]
   
-  log_lamb <- c(seq(2, 6.5, length.out = 20))
+  log_lamb <- c(seq(2, 6.2, length.out = 20))
   lamb_seq <- exp(log_lamb)
   
   BIC_table <- list()
@@ -316,6 +316,11 @@ for(simul in 1:simul_times) {
                      X = X, Y = Y, V = V, Phi = Phi, theta_0 = init_val$theta, tau_seq = tau_seq, weight = TRUE)
   simul_SP_model[[simul]] <- result
 }
+
+
+###############
+## Save Data ##
+###############
 
 save(simul_add_decomp, simul_LR_model, simul_SP_model, est_gamma, 
      LR_mat, sp_mat, Phi, tau_seq, tau_seq_real, X_list, file = "ksh_simul_location_scale_n_p_800_200.RData")
