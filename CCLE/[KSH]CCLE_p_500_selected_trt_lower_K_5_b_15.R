@@ -35,6 +35,14 @@ data.frame(Y_sd) %>%
 Y <- Y[, -"Panobinostat"] %>%
   column_to_rownames(var = "CCLE_Name") %>%
   as.matrix
+
+## Select treatment which has wide boxplot
+
+quant <- apply(Y, 2, quantile, probs = 0.75)
+selected_drug <- quant[quant >= 0.1] %>% names()
+
+Y <- Y[, selected_drug]
+
 m <- ncol(Y)
 n <- nrow(Y)
 
@@ -92,7 +100,7 @@ gene_ex_data <- data.frame(col = 1:ncol(X), gene_ex_nm = colnames(X))
 
 
 ### quantile regression for initial value
-set.seed(4)
+set.seed(3)
 X <- as.matrix(X)
 Y <- as.matrix(Y)
 
@@ -103,7 +111,11 @@ QR_Lasso <- foreach(g = 1:m) %dopar% {
   library(splines)
   library(rqPen)
 
-  QR_model <- rqPen::rq.lasso.fit.mult(x = X[, -1], y = Y[, g], tau_seq = tau_seq, lambda = 0.001)
+  median <- median(Y[, g])
+
+  init_lamb <- ifelse(median == 8, 0.0001, 0.001)
+
+  QR_model <- rqPen::rq.lasso.fit.mult(x = X[, -1], y = Y[, g], tau_seq = tau_seq, lambda = init_lamb)
   QR_Lasso_coef <- lapply(QR_model, FUN = function(x) x$coefficients %>% data.frame(value = .) %>%
                             tibble::rownames_to_column(var = "variable")) %>%
       `names<-`(tau_seq) %>%
@@ -162,17 +174,13 @@ init_val_AD <- add_decomp_r(delta = 1, lambda_1 = 0.1, lambda_2 = 0.1, tol_error
                             X = X, Y = Y, V = V, Phi = Phi, 
                             theta_0 = init_val_SP$theta, Z_0 = X%*%alpha_init, tau_seq = tau_seq, weight = FALSE)
 
-# Or you can import initial value from my github
-github_URL <- "https://raw.githubusercontent.com/S0Hye0NKim/add_decomp/master/CCLE/ksh_CCLE_p_500_lower_init_val_AD.RData"
-load(url(github_URL))
-
 
 ##################################
 ## 1. Additive decomposed model ##
 ##################################
-log_lamb1 <- c( seq(4.2, 4.7, length.out = 20))
+log_lamb1 <- c( seq(3.93, 4.2, length.out = 20))
 lamb1_seq <- exp(log_lamb1)
-log_lamb2 <- c(seq(2, 2.7, length.out = 20))
+log_lamb2 <- c(seq(2, 2.5, length.out = 20))
 lamb2_seq <- exp(log_lamb2)
 
 BIC_table <- list()
@@ -221,6 +229,6 @@ result_AD <- add_decomp_r(delta = 1, lambda_1 = BIC_params$lambda_1, lambda_2 = 
 ## Save data ##
 ###############
 
-save.image(file = "ksh_CCLE_p_500_lower.RData")
+save.image(file = "ksh_CCLE_p_500_selected_trt_lower_K_5_b_15.RData")
 
 
