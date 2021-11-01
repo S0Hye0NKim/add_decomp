@@ -29,7 +29,7 @@ p <- 200
 b <- 15
 num_rank <- 3
 num_rank_X <- 100
-simul_times <- 100
+simul_times <- 50
 
 sigma_mat <- matrix(nrow = p, ncol = p)
     for(j in 1:p) {
@@ -69,7 +69,7 @@ Y_list <- mapply(FUN = function(X, LR, SP, eps) X[, -1] %*% LR_mat + X %*% SP + 
 
 
 ### Calculate kronecker product
-K <- 5
+K <- (2 * n^(1/6)) %>% round()
 tau_seq <- seq(from = 0.35, to = 0.65, length.out = b)
 tau_seq_real <- tau_seq[tau_seq >= 0.4 & tau_seq  <= 0.6]
 idx_tau <- (tau_seq >= "0.4" & tau_seq <= "0.6")
@@ -150,9 +150,9 @@ for(simul in 1:simul_times) {
   V <- V_list[[simul]]
   init_val <- init_val_AD[[simul]]
   
-  log_lamb1 <- c( seq(5.7, 6.2, length.out = 20))
+  log_lamb1 <- c( seq(5.7, 6.5, length.out = 20))
   lamb1_seq <- exp(log_lamb1)
-  log_lamb2 <- c(seq(5.7, 6.3, length.out = 20))
+  log_lamb2 <- c(seq(6.1, 7, length.out = 20))
   lamb2_seq <- exp(log_lamb2)
   
   BIC_table <- list()
@@ -244,7 +244,7 @@ for(simul in 1:simul_times) {
   V <- V_list[[simul]]
   init_val <- init_val_SP[[simul]]
   
-  log_lamb <- c(seq(2, 6.5, length.out = 20))
+  log_lamb <- c(seq(2, 7, length.out = 20))
   lamb_seq <- exp(log_lamb)
   
   BIC_table <- list()
@@ -278,4 +278,4 @@ for(simul in 1:simul_times) {
 }
 
 save(simul_add_decomp, simul_LR_model, simul_SP_model, est_gamma, 
-     LR_mat, sp_mat, Phi, tau_seq, tau_seq_real, X_list, file = "ksh_simul_normal_error_n_p_800_200.RData")
+     LR_mat, sp_mat, Phi, tau_seq, tau_seq_real, X_list, file = "ksh_simul_normal_error_n_p_800_200_K_n.RData")

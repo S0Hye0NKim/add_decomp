@@ -28,8 +28,8 @@ m <- 10
 p <- 200
 b <- 15
 num_rank <- 3
-num_rank_X <- 100
-simul_times <- 100
+num_rank_X <- 50
+simul_times <- 50
 
 sigma_mat <- matrix(nrow = p, ncol = p)
     for(j in 1:p) {
@@ -69,7 +69,7 @@ Y_list <- mapply(FUN = function(X, LR, SP, eps) X[, -1] %*% LR_mat + X %*% SP + 
 
 
 ### Calculate kronecker product
-K <- 5
+K <- (2 * n^(1/6)) %>% round()
 tau_seq <- seq(from = 0.35, to = 0.65, length.out = b)
 tau_seq_real <- tau_seq[tau_seq >= 0.4 & tau_seq  <= 0.6]
 idx_tau <- (tau_seq >= "0.4" & tau_seq <= "0.6")
@@ -150,9 +150,9 @@ for(simul in 1:simul_times) {
   V <- V_list[[simul]]
   init_val <- init_val_AD[[simul]]
   
-  log_lamb1 <- c( seq(1, 1.5, length.out = 20))
+  log_lamb1 <- c( seq(2.5, 3.9, length.out = 20))
   lamb1_seq <- exp(log_lamb1)
-  log_lamb2 <- c(seq(5, 6.2, length.out = 20))
+  log_lamb2 <- c(seq(5, 5.5, length.out = 20))
   lamb2_seq <- exp(log_lamb2)
   
   BIC_table <- list()
@@ -191,7 +191,7 @@ for(simul in 1:simul_times) {
     filter(S_hat_net != 0) %>%
     arrange(BIC) %>%  
     head(1)
-  
+
   result <- add_decomp_r(delta = 1, lambda_1 = BIC_params$lambda_1, lambda_2 = BIC_params$lambda_2, 
                        tol_error = 0.1^5, max_iter = 50, X, Y, V, Phi, 
                        theta_0 = init_val$theta, Z_0 = init_val$Z, tau_seq = tau_seq, weight = TRUE)
@@ -244,7 +244,7 @@ for(simul in 1:simul_times) {
   V <- V_list[[simul]]
   init_val <- init_val_SP[[simul]]
   
-  log_lamb <- c(seq(1, 6.2, length.out = 20))
+  log_lamb <- c(seq(1, 5.5, length.out = 20))
   lamb_seq <- exp(log_lamb)
   
   BIC_table <- list()
@@ -278,4 +278,4 @@ for(simul in 1:simul_times) {
 }
 
 save(simul_add_decomp, simul_LR_model, simul_SP_model, est_gamma, check_sp_table, 
-     LR_mat, sp_mat, Phi, tau_seq, tau_seq_real, X_list, file = "ksh_simul_normal_error_n_p_200_200.RData")
+     LR_mat, sp_mat, Phi, tau_seq, tau_seq_real, X_list, file = "ksh_simul_normal_error_n_p_100_200_K_n.RData")

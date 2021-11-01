@@ -28,7 +28,7 @@ m <- 10
 p <- 200
 b <- 15
 num_rank <- 3
-num_rank_X <- 99
+num_rank_X <- 50
 simul_times <- 50
 
 sigma_mat <- matrix(nrow = p, ncol = p)
@@ -71,7 +71,7 @@ Y_list <- mapply(FUN = function(X, LR, SP, eps) X[, -1] %*% LR + X %*% SP + matr
 
 
 ### Calculate kronecker product
-K <- 5
+K <- (2 * n^(1/6)) %>% round()
 tau_seq <- seq(from = 0.35, to = 0.65, length.out = b)
 tau_seq_real <- tau_seq[tau_seq >= 0.4 & tau_seq  <= 0.6]
 idx_tau <- (tau_seq >= "0.4" & tau_seq <= "0.6")
@@ -128,13 +128,9 @@ for(simul in 1:simul_times) {
     for(g in 1:m) {  
         for(j in 0:p) {
             QR_coef <- QR_Lasso_data %>% filter(simulation == simul, group == g, variable == paste0("x", j)) %>% .$value
-            idx <- seq(1, b, 3)
+            idx <- seq(2, b-1, length.out = K)
       
-            theta_1 <- solve(Phi[idx, ], QR_coef[idx])
-            theta_2 <- solve(Phi[idx + 1, ], QR_coef[idx + 1])
-            theta_3 <- solve(Phi[idx + 2, ], QR_coef[idx + 2])
-
-            est_theta <- matrix(c(theta_1, theta_2, theta_3), nrow = 5) %>% apply(1, mean)
+            est_theta <- solve(Phi[idx, ], QR_coef[idx])
 
             first_init_SP[((j*K)+1):((j+1)*K), g] <- est_theta
         }
@@ -192,7 +188,7 @@ for(simul in 1:simul_times) {
   V <- V_list[[simul]]
   init_val <- init_val_AD[[simul]]
   
-  log_lamb1 <- c( seq(1, 2.6, length.out = 20))
+  log_lamb1 <- c( seq(3, 4.27, length.out = 20))
   lamb1_seq <- exp(log_lamb1)
   log_lamb2 <- c(seq(3, 5.3, length.out = 20))
   lamb2_seq <- exp(log_lamb2)
@@ -286,7 +282,7 @@ for(simul in 1:simul_times) {
   V <- V_list[[simul]]
   init_val <- init_val_SP[[simul]]
   
-  log_lamb <- c(seq(3, 5.3, length.out = 20))
+  log_lamb <- c(seq(1, 5.3, length.out = 20))
   lamb_seq <- exp(log_lamb)
   
   BIC_table <- list()
@@ -322,4 +318,4 @@ for(simul in 1:simul_times) {
 
 
 save(simul_add_decomp, simul_LR_model, simul_SP_model, est_gamma, 
-     LR_mat, sp_mat, Phi, tau_seq, tau_seq_real, X_list, file = "ksh_simul_location_scale_n_p_100_200.RData")
+     LR_mat, sp_mat, Phi, tau_seq, tau_seq_real, X_list, file = "ksh_simul_location_scale_n_p_100_200_K_n.RData")
