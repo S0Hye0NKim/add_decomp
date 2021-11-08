@@ -37,7 +37,7 @@ Y <- Y[, -"Panobinostat"] %>%
   as.matrix
 
 ## Select treatment which has wide boxplot
-quant_diff <- apply(Y, 2, quantile, probs = c(0.1,0.3)) %>%
+quant_diff <- apply(Y, 2, quantile, probs = c(0.4,0.6)) %>%
   apply(2, diff)
 
 drug_idx <- colnames(Y)[quant_diff != 0]
@@ -81,8 +81,8 @@ gene_ex <- colnames(X)
 ### 0-(3) spline
 K <- 5
 b <- 15
-tau_seq <- seq(from = 0.05, to = 0.35, length.out = b)
-idx_tau <- (tau_seq >= "0.1" & tau_seq <= "0.3")
+tau_seq <- seq(from = 0.35, to = 0.65, length.out = b)
+idx_tau <- (tau_seq >= "0.4" & tau_seq <= "0.6")
 tau_seq_real <- tau_seq[idx_tau]
 
 knots_seq <- seq(min(tau_seq) - 0.02, max(tau_seq) + 0.02, length.out = K)
@@ -179,7 +179,7 @@ init_val_AD <- add_decomp_r(delta = 1, lambda_1 = 0.1, lambda_2 = 0.1, tol_error
 ##################################
 ## 1. Additive decomposed model ##
 ##################################
-log_lamb1 <- c( seq(4, 5, length.out = 20))
+log_lamb1 <- c( seq(3.81, 4.1, length.out = 20))
 lamb1_seq <- exp(log_lamb1)
 log_lamb2 <- c(seq(2, 2.5, length.out = 20))
 lamb2_seq <- exp(log_lamb2)
@@ -230,6 +230,6 @@ result_AD <- add_decomp_r(delta = 1, lambda_1 = BIC_params$lambda_1, lambda_2 = 
 ## Save data ##
 ###############
 
-save.image(file = "ksh_CCLE_p_500_selected_trt_lower_K_5_b_15.RData")
+save.image(file = "ksh_CCLE_p_500_selected_trt_middle_K_5_b_15.RData")
 
 
