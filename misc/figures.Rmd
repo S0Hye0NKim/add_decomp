@@ -1,0 +1,464 @@
+---
+title: "figures"
+author: "Sohyeon Kim"
+date: "7/14/2021"
+output:
+  html_document:
+    self_contained: false
+---
+
+# 0. Packages
+
+```{r library packages, warning = FALSE, message = FALSE}
+library(tidyverse)
+library(data.table)
+library(Matrix)
+library(gplots)
+library(gridExtra)
+```
+
+
+# 1. Simulation
+
+## 1-1. low-rank matrix
+
+
+```{r low-rank matrix heatmap}
+m <- ncol(LR_mat)
+n <- nrow(X_list[[1]])
+p <- ncol(X_list[[1]]) - 1
+
+colnames(LR_mat) <- paste0("col_", 1:m)
+rownames(LR_mat) <- paste0("row_", 1:p)
+heatmap.2(LR_mat, scale = "none", col = bluered(100), trace = "none", density.info = "none")
+title("true low-rank matrix");
+```
+
+## 1-2. Sparse matrix
+
+
+```{r Underlying smooth function in sparse matrix of normal and mixture error}
+S_data <- data.frame(col = rep(1:m, each = (p+1)), 
+           row = rep(1:(p+1), m),
+           value = as.vector(sp_mat)) %>%
+  filter(abs(value) > 0.1^5, row != 1) %>%
+  mutate(index = paste0("(", row, ",", col, ")"))
+
+
+smooth_func <- data.frame(index= rep(S_data$index, each = length(tau_seq)) %>%
+             factor(levels = S_data$index)) %>%
+  mutate(tau_seq = rep(tau_seq, nrow(S_data)), 
+         value = rep(S_data$value, each = 15)) %>%
+  ggplot() +
+  geom_line(aes(x = tau_seq, y = value, color = index), size = 1.5) +
+  facet_wrap(~index) +
+  labs(x = expression(tau)) +
+  ggtitle(expression("smooth function in " ~ "S("~tau~")")) 
+```
+
+
+
+```{r Underlying smooth function in sparse matrix of location-scale model}
+S_data <- data.frame(col = rep(1:m, each = (p+1)), 
+           row = rep(1:(p+1), m),
+           value = as.vector(sp_mat)) %>%
+  filter(abs(value) > 0.1^5, row != 1) %>%
+  mutate(index = paste0("(", row, ",", col, ")"))
+
+smooth_func <- data.frame(index= rep(S_data$index, each = length(tau_seq)) %>%
+             factor(levels = S_data$index)) %>%
+  mutate(tau_seq = rep(tau_seq, nrow(S_data)), 
+         value = rep(S_data$value, each = 15)) %>%
+  mutate(quantile = ifelse(index == "(4,1)", qnorm(tau_seq, mean = 0, sd = 1), 0)) %>%
+  mutate(value = value + 5 * quantile) %>%
+  ggplot() +
+  geom_line(aes(x = tau_seq, y = value, color = index), size = 1.5) +
+  facet_wrap(~index) +
+  labs(x = expression(tau)) +
+  ggtitle(expression("smooth function in " ~ "S("~tau~")")) 
+```
+
+
+
+# 2. CCLE when (n,p) = (288, 500)
+
+## 2-1. Small standard deviation of Panobinostat
+
+```{r}
+Y <- fread("CCLE_Y_new.csv") %>%
+  tbl_df %>% column_to_rownames("CCLE_Name")
+
+sd_drug <- apply(Y, 2, sd)
+
+sd_drug %>% as.data.frame %>%
+  `colnames<-`(value = "sd") %>%
+  rownames_to_column(var = "treatment") %>%
+  mutate(color = ifelse(treatment == "Panobinostat", "blue", "red"), 
+         treatment = factor(treatment, levels = sort(sd_drug, decreasing =  TRUE) %>% names), 
+         label_x = sd + 0.2) %>%
+  ggplot +
+  geom_col(aes(x = treatment, y = sd, fill = color)) +
+  scale_fill_manual(values = c("red", rep("blue", 23))) +
+  coord_flip() +
+  geom_text(aes(x = treatment, y = label_x, label = round(sd, 2))) +
+  theme(legend.position = "none")
+```
+
+```{r load data}
+# Load CCLE result first.
+drug_dist <- read.csv("CCLE_drug_distance.csv", check.names = FALSE)
+
+m <- ncol(Y)
+
+trt_nm <- data.frame(col = 1:m, treatment = colnames(Y))
+gene_ex <- data.frame(row = 1:(p+1), gene_ex = colnames(X))
+```
+
+## 2-1. low-rank matrix
+
+```{r recover L_hat}
+X_tilde <- X[, -1]
+L_hat_AD <- corpcor::pseudoinverse(X_tilde, tol = 0.1^5) %*% result_AD$Z
+```
+
+
+```{r L_hat heatmap in AD model}
+set.seed(1)
+colnames(L_hat_AD) <- colnames(Y)
+rownames(L_hat_AD) <- colnames(X)[-1]
+heatmap.2(L_hat_AD, scale = "none", col = bluered(100), 
+          trace = "none", density.info = "none")
+title(expression(hat(L)["AD"]~" heatmap"))
+```
+
+```{r L_hat dendrogram in AD model}
+r_hat_AD <- rankMatrix(L_hat_AD)[1]
+L_hat_AD_t <- t(L_hat_AD)
+dist_mat_AD <- dist(L_hat_AD_t, method = "euclidean")
+cluster_AD <- hclust(dist_mat_AD, method = "complete")
+plot(cluster_AD, cex = 0.6, main = expression("treatment clustering in "~hat(L)["AD"]~" when "~Delta~"=[0.4,0.6]"))
+rect.hclust(cluster_AD, k = r_hat_AD, border = (1:r_hat_AD) + 1)
+
+```
+
+
+```{r treatment distance heatmap}
+drug_order_AD <- colnames(Y)[cluster_AD$order]
+
+group_1 <- drug_order_AD[1:2]
+group_2 <- drug_order_AD[3:5]
+group_3 <- drug_order_AD[6:7]
+group_4 <- drug_order_AD[8:16]
+group_5 <- drug_order_AD[17:21]
+
+drug_dist %>%
+  pivot_longer(cols = !treatment) %>%
+  `colnames<-`(value = c("trt_1", "trt_2", "value")) %>%
+  filter(trt_1 != "Panobinostat", trt_2 != "Panobinostat") %>%
+  mutate(trt_1 = factor(trt_1, levels = drug_order_AD), 
+         trt_2 = factor(trt_2, levels = drug_order_AD), 
+         group = case_when(trt_1 %in% group_1 & trt_2 %in% group_1 ~ "group_1", 
+                           trt_1 %in% group_2 & trt_2 %in% group_2 ~ "group_2", 
+                           trt_1 %in% group_3 & trt_2 %in% group_3 ~ "group_3", 
+                           trt_1 %in% group_4 & trt_2 %in% group_4 ~ "group_4", 
+                           trt_1 %in% group_5 & trt_2 %in% group_5 ~ "group_5",
+                           )) %>%
+  arrange(trt_1, trt_2) %>%
+  filter(!is.na(group)) %>% 
+  ggplot(aes(x = trt_1, y = trt_2, fill = value)) +
+  geom_tile(color = "grey") + 
+  theme(axis.text.x = element_text(angle = 90)) +
+  scale_fill_gradient2(low = "blue", mid = "white", high = "red", midpoint = 0.5) +
+  xlab(label = "treatment") +
+  ylab(label = "treatment") +
+  ggtitle(label = expression("Distance heatmap of treatment subgroup in "~hat(L)["AD"]~" when "~Delta~"=[0.1,0.3]")) 
+```
+
+```{r lowest RWCSS-j in L (AD)}
+clust_est_AD <- cutree(cluster_AD, k = r_hat_AD) %>% as.data.frame() %>%
+  rownames_to_column(var = "trt") %>%
+  `colnames<-`(value = c("trt", "cluster"))
+
+RWCSS_j <- L_hat_AD %>% data.frame(check.names = FALSE) %>%
+  rownames_to_column(var = "gene_ex") %>%
+  pivot_longer(cols = !"gene_ex", names_to = "trt") %>%
+  left_join(y = clust_est_AD, by = "trt") %>%
+  split(.$gene_ex) %>%
+  lapply(FUN = function(x) data.frame(SS_num = x %>% group_by(cluster) %>%
+                                        summarise(SS = sum((value - mean(value))^2)) %>%
+                                        dplyr::select(SS) %>%
+                                        apply(2, sum), 
+                                      SS_denom = sum((x$value - mean(x$value))^2))) %>%
+  bind_rows(.id = "gene_ex") %>%
+  mutate(RWCSS = SS_num/SS_denom) %>%
+  `rownames<-`(c()) %>%
+  arrange(RWCSS)
+
+RWCSS_j %>% arrange(RWCSS) %>% 
+  head(20) %>%
+  mutate(gene_ex = factor(gene_ex, levels = gene_ex)) %>%
+  ggplot() +
+  geom_col(aes(x = gene_ex, y = RWCSS)) +
+  theme(axis.text.x = element_text(angle = 90)) +
+  xlab(label = "gene expression") +
+  ylab(label = "RWCSS-j") +
+  ggtitle(label = expression("lowest RWCSS-j in "~hat(L)["AD"]~" when "~Delta~"=[0.1,0.3]"))
+```
+
+
+## 2-2. Sparse matrix
+
+```{r sparse matrix nonzero table}
+idx_tau <- (tau_seq >= "0.1" & tau_seq <= "0.3")
+tau_seq_real <- tau_seq[idx_tau]
+
+gamma_tau_hat_AD <- est_gamma(Phi[idx_tau, ], result_AD$theta)
+
+check_sp_table(true = matrix(0, nrow = p+1, ncol = m), est = gamma_tau_hat_AD, 
+               tau_seq = tau_seq_real, table = TRUE) %>%
+  .["Negative", ]
+```
+
+
+
+
+```{r sparse matrix heatmap}
+library(rebus)
+gene_ex <- data.frame(row = 1:(p+1), gene_ex = colnames(X))
+gene_rm_pattern <- SPC %R% escape_special("(") %R% one_or_more(DGT) %R% escape_special(")")
+Y_col <- factor(colnames(Y), ordered = TRUE, levels = colnames(Y))
+gene_ex_name <- colnames(X) %>% str_remove_all(pattern = gene_rm_pattern)
+
+nz_data <- lapply(gamma_tau_hat_AD, FUN = function(x) data.frame(col = rep(1:m, each = (p+1)),
+                                                   row = rep(1:(p+1), m),
+                                                   value = as.vector(x))) %>%
+  `names<-`(tau_seq_real) %>%
+  bind_rows(.id = "tau") %>%
+  mutate(is_nonzero = ifelse(abs(value) < 0.1^5, 0, 1)) %>%
+  group_by(col, row) %>%
+  summarise(is_nonzero = mean(is_nonzero)) %>%
+  ungroup() %>%
+  mutate(is_nonzero = ifelse(is_nonzero == 0, 0, 1) %>% as.character) %>%
+  left_join(y = trt_nm, by = "col") %>%
+  left_join(y = gene_ex, by = "row") %>%
+  mutate(gene_ex = str_remove_all(gene_ex, pattern = gene_rm_pattern) %>%
+           factor(levels = rev(gene_ex_name))
+           )
+           
+nz_row <- nz_data %>% filter(is_nonzero == 1) %>% .$row %>% unique
+
+nz_data %>% filter(row %in% nz_row) %>%
+  ggplot(aes(x = treatment, y = gene_ex, fill = is_nonzero)) +
+  geom_tile(color = "grey") +
+  scale_fill_manual(values = c("white", "black")) + 
+  theme_bw() +
+  theme(axis.line = element_blank(),
+    panel.grid.major = element_blank(),
+    panel.grid.minor = element_blank(),
+    panel.border = element_blank(),
+    panel.background = element_blank(), 
+    axis.title.x = element_blank(), 
+    axis.text.x = element_text(angle = 90), 
+    axis.title.y = element_blank(), 
+    legend.position = "none") +
+  ggtitle(expression("S("~tau[l]~") in AD model"))
+```
+
+
+
+```{r}
+library(tidyr)
+library(rebus)
+library(gridExtra)
+
+idx_nz_est <- lapply(gamma_tau_hat_AD, FUN = function(x) which(abs(x) > 0.1^5, arr.ind = TRUE) %>% as_tibble) %>%
+    bind_rows (.id = "tau") %>%
+    group_by(row, col) %>%
+    summarise(zero = n()) %>%
+    filter(row != 1)
+
+nz_column <- idx_nz_est %>% .$col %>% unique %>% sort
+
+gamma_data <- gamma_tau_hat_AD %>%
+  lapply(FUN = function(x) x[idx_nz_est$row, idx_nz_est$col] %>% diag %>%
+           data.frame(row = idx_nz_est$row, col = idx_nz_est$col, value = . )) %>%
+  `names<-`(value = tau_seq_real) %>%
+  bind_rows(.id = "tau") %>%
+  unite(col = index, row, col, sep = ",") %>%
+  mutate(index = paste0("(", index, ")"), tau = as.numeric(tau))
+
+row_pattern <- "\\(" %R% one_or_more(DGT)
+col_pattern <- one_or_more(DGT) %R% "\\)"
+
+
+gamma_data_list <- split(gamma_data, gamma_data$index)
+spline_int <- lapply(gamma_data_list, FUN = function(x) as.data.frame(spline(x$tau, x$value))) %>%
+  bind_rows(.id = "index")
+
+data_for_S_mat_plot <- full_join(gamma_data, spline_int, by = c("index", "tau" = "x")) %>%
+  mutate(row = str_extract(index, pattern = row_pattern) %>% parse_number, 
+         col = str_extract(index, pattern = col_pattern) %>% parse_number) %>%
+  left_join(gene_ex, by = "row") %>%
+  left_join(trt_nm, by = "col") %>%
+  dplyr::select(tau, gene_ex, treatment, row, col, line = y, point = value) %>%
+  pivot_longer(cols = c(line, point), names_to = "type", values_to = "S_entry") 
+
+```
+
+
+
+
+
+
+### Selected gene_ex graph for lower quantile
+
+```{r smooth function for lower quantile}
+idx_select <- c("(411,2)", "(91,2)", "(121,3)", "(307,4)", "(449,8)", "(112,11)", "(230,11)", 
+                "(203,16)", "(304,18)", "(435, 19)")
+
+temp_data <- data_for_S_mat_plot %>%
+  mutate(index = paste0("(", row, ",", col, ")")) %>%
+  filter(index %in% idx_select) %>%
+  mutate(gene_ex = as.character(gene_ex), treatment = as.character(treatment)) %>% 
+  arrange(treatment)
+
+selected_trt <- temp_data$treatment %>% unique
+
+temp_data_list <- split(temp_data, temp_data$gene_ex)
+
+
+graph_S_tau <- list()
+
+for(gene_idx in 1:length(temp_data_list)) {
+  sub_data <- temp_data_list[[gene_idx]] %>%
+    mutate(treatment = paste0("treatment : ", treatment), 
+           gene_ex = paste0("gene : ", gene_ex))
+  #y_min <- sub_data$S_entry %>% min(na.rm = TRUE)
+  #y_max <- sub_data$S_entry %>% max(na.rm = TRUE)
+  y_mean <- sub_data$S_entry %>% mean(na.rm = TRUE)
+  
+  sub_plot <- ggplot() +
+  geom_line(data = filter(sub_data, type == "line", !is.na(S_entry)), 
+            aes(x = tau, y = S_entry, group = gene_ex, color = gene_ex), size = 1.2) +
+  #geom_point(data = filter(sub_data, type == "point", !is.na(S_entry)), 
+             #aes(x = tau, y = S_entry, color = gene_ex), size = 2) +
+  coord_cartesian(ylim = c(y_mean-0.25, y_mean+0.25)) +
+  facet_wrap(gene_ex ~ treatment) +
+  theme(legend.position = "none")
+  
+  graph_S_tau[[gene_idx]] <- sub_plot
+  
+}
+
+temp_data_ver2 <- data_for_S_mat_plot %>%
+  mutate(index = paste0("(", row, ",", col, ")")) %>%
+  filter(index %in% c( "(326,21)", "(326,3)")) %>%
+  mutate(gene_ex = as.character(gene_ex) %>% paste0("gene : ", .), treatment = as.character(treatment)) %>% 
+  arrange(treatment)
+
+y_mean <- temp_data_ver2 %>% group_by(treatment) %>% summarise(mean = mean(S_entry,  na.rm = TRUE)) %>%
+  .$mean %>% mean
+
+sub_plot <- ggplot() +
+  geom_line(data = filter(temp_data_ver2, type == "line", !is.na(S_entry)), 
+            aes(x = tau, y = S_entry, group = treatment, color = treatment), size = 1.2) +
+  #geom_point(data = filter(temp_data_ver2, type == "point", !is.na(S_entry)), 
+  #           aes(x = tau, y = S_entry, color = treatment), size = 2) +
+  coord_cartesian(ylim = c(y_mean-0.25, y_mean+0.25)) +
+  facet_wrap(~gene_ex, scales = "free")
+
+
+
+graph_S_tau[[gene_idx + 1]] <- sub_plot
+
+
+```
+
+
+
+
+```{r smooth function layout in lower quantile}
+lay <- rbind(c(1, 2, 3), 
+             c(4, 5, 6), 
+             c(7, 8, 9), 
+             c(10, 10, 10))
+
+grid.arrange(grobs = graph_S_tau, layout_matrix = lay)
+```
+
+
+
+### Selected gene_ex graph for middle interval
+
+
+```{r smooth function for middle quantile}
+idx_select <- c("(21,2)", "(9,5)", "(315,5)", "(25,7)", "(326,8)", "(371,9)")
+
+temp_data <- data_for_S_mat_plot %>%
+  mutate(index = paste0("(", row, ",", col, ")")) %>%
+  filter(index %in% idx_select) %>%
+  mutate(gene_ex = as.character(gene_ex), treatment = as.character(treatment)) %>% 
+  arrange(treatment)
+
+selected_trt <- temp_data$treatment %>% unique
+
+temp_data_list <- split(temp_data, temp_data$gene_ex)
+
+
+graph_S_tau <- list()
+
+for(gene_idx in 1:length(temp_data_list)) {
+  sub_data <- temp_data_list[[gene_idx]] %>%
+    mutate(treatment = paste0("treatment : ", treatment), 
+           gene_ex = paste0("gene : ", gene_ex))
+  #y_min <- sub_data$S_entry %>% min(na.rm = TRUE)
+  #y_max <- sub_data$S_entry %>% max(na.rm = TRUE)
+  y_mean <- sub_data$S_entry %>% mean(na.rm = TRUE)
+  
+  sub_plot <- ggplot() +
+  geom_line(data = filter(sub_data, type == "line", !is.na(S_entry)), 
+            aes(x = tau, y = S_entry, group = gene_ex, color = gene_ex), size = 1.2) +
+  #geom_point(data = filter(sub_data, type == "point", !is.na(S_entry)), 
+             #aes(x = tau, y = S_entry, color = gene_ex), size = 2) +
+  coord_cartesian(ylim = c(y_mean-0.25, y_mean+0.25)) +
+  facet_wrap(gene_ex ~ treatment) +
+  theme(legend.position = "none")
+  
+  graph_S_tau[[gene_idx]] <- sub_plot
+  
+}
+
+temp_data_ver2 <- data_for_S_mat_plot %>%
+  mutate(index = paste0("(", row, ",", col, ")")) %>%
+  filter(index %in% c( "(423,5)", "(423,10)")) %>%
+  mutate(gene_ex = as.character(gene_ex) %>% paste0("gene : ", .), treatment = as.character(treatment)) %>% 
+  arrange(treatment)
+
+y_mean <- temp_data_ver2 %>% group_by(treatment) %>% summarise(mean = mean(S_entry,  na.rm = TRUE)) %>%
+  .$mean %>% mean
+
+sub_plot <- ggplot() +
+  geom_line(data = filter(temp_data_ver2, type == "line", !is.na(S_entry)), 
+            aes(x = tau, y = S_entry, group = treatment, color = treatment), size = 1.2) +
+  #geom_point(data = filter(temp_data_ver2, type == "point", !is.na(S_entry)), 
+  #           aes(x = tau, y = S_entry, color = treatment), size = 2) +
+  #coord_cartesian(ylim = c(y_mean-0.25, y_mean+0.25)) +
+  facet_wrap(~gene_ex, scales = "free")
+
+
+
+graph_S_tau[[gene_idx + 1]] <- sub_plot
+
+
+```
+
+
+```{r smooth function layout in middle quantile}
+lay <- rbind(c(1, 2, 3), 
+             c(4, 5, 6), 
+             c(7, 7, 7))
+
+grid.arrange(grobs = graph_S_tau, layout_matrix = lay)
+```
+
+

@@ -1,0 +1,202 @@
+---
+title: "Simulation Performance Evaluation"
+author: "Sohyeon Kim"
+date: "12/8/2021"
+output: html_document
+---
+
+# 0. Load packages
+
+```{r warning = FALSE, message = FLASE}
+setwd("C:/Users/Sohyeon Kim/add_decomp_linux")
+library(tidyverse)
+library(Matrix)
+library(foreach)
+library(doParallel)
+library(Rcpp)
+library(glmnet)
+library(fda)
+library(expm)
+
+sourceCpp("[KSH]add_decomp_function.cpp")
+source("https://raw.githubusercontent.com/S0Hye0NKim/add_decomp/master/functions/add_decomp_function.R")
+```
+
+Assign the model that you want to evaluate performance as simul_result.
+
+
+# 1. Low-rank matrix
+
+
+## 1-1. avgerage of rank
+
+```{r}
+Z_list <- simul_result %>% lapply(FUN = function(x) x$Z)
+result_rank <- Z_list %>% lapply(FUN = function(x) rankMatrix(x)[1]) %>% unlist 
+mean(result_rank)
+```
+
+## 1-2. Purity and ARI
+
+```{r}
+num_rank <- rankMatrix(LR_mat)
+L_hat_t <- t(LR_mat)
+dist_mat <- dist(L_hat_t, method = "euclidean")
+cluster <- hclust(dist_mat, method = "complete")
+clust_true <- cutree(cluster, k = num_rank)
+
+library(corpcor)
+L_hat_list <- mapply(FUN = function(X, Z) pseudoinverse(X[, -1]) %*% Z, X = X_list, Z = Z_list, SIMPLIFY = FALSE)
+
+r_hat_list <- Z_list %>% lapply(FUN = function(x) rankMatrix(x)[1])
+clust_est <- mapply(function(L_hat, r_hat) t(L_hat) %>% dist(method = "euclidean") %>%
+                      hclust(method = "complete") %>% cutree(k = r_hat), L_hat = L_hat_list, r_hat = r_hat_list, 
+                    SIMPLIFY = FALSE)
+
+library(funtimes)
+lapply(clust_est, FUN = function(x) purity(clust_true, x) %>% .$pur) %>% unlist %>% mean %>% round(2)
+
+library(aricode)
+lapply(clust_est, FUN = function(x) ARI(clust_true, x)) %>% unlist %>% mean %>% round(2)
+```
+
+## 1-3. exact / underfit / overfit
+
+```{r}
+(result_rank == 3) %>% mean
+(result_rank < 3) %>% mean
+(result_rank > 3) %>% mean
+```
+
+# 2. Sparse matrix
+
+```{r}
+theta_list <- lapply(simul_result, FUN = function(x) x$theta)
+
+idx_tau <- (tau_seq >= 0.4 & tau_seq <= 0.6)
+gamma_list <- lapply(theta_list, FUN = function(x) est_gamma(Phi[idx_tau, ], theta = x))
+```
+
+
+## 2-1. TP / TN
+
+```{r}
+simul_times <- length(simul_result)
+sp_table <- list()
+for(simul in 1:simul_times) {
+  sp_table[[simul]] <- check_sp_table(true = sp_mat, est = gamma_list[[simul]], 
+                                      table = FALSE, tau_seq = tau_seq_real)
+}
+
+
+sp_table %>%
+  bind_rows() %>%
+  mutate(TP = TPR, TN = 1-FPR) %>%
+  dplyr::select(TP, TN) %>%
+  summarise(TP_mean = mean(TP), TP_sd = sd(TP), TN_mean = mean(TN), TN_sd = sd(TN)) %>% round(2)
+```
+
+
+## 2-2. Relative Error
+
+
+```{r}
+nz_idx_true <- which(abs(sp_mat) > 0.1^5, arr.ind = TRUE) %>% as_tibble
+nz_true_set <- paste0("(", nz_idx_true$row, ",", nz_idx_true$col, ")")
+simul_times <- length(simul_result)
+
+S_mat_est_type <- vector(mode = "character", length = simul_times)
+for(simul in 1:simul_times) {
+  nz_idx_est <- lapply(gamma_list[[simul]], FUN = function(x) which(abs(x) > 0.1^5, arr.ind = TRUE) %>% as_tibble) %>%
+    bind_rows(.id = "tau") %>%
+    group_by(row, col) %>%
+    summarise(non_zero = n(), .groups = "keep")
+  nz_est_set <- paste0("(", nz_idx_est$row, ",", nz_idx_est$col, ")")
+  
+  exact <- intersect(nz_true_set, nz_est_set)
+  FN <- setdiff(nz_est_set, nz_true_set)
+  FP <- setdiff(nz_true_set, nz_est_set)
+  
+  S_mat_est_type[simul] <- case_when(length(exact) == 20 & length(FN) == 0 & length(FP) == 0 ~ "exact", 
+                                     length(FN) > 0 & length(FP) == 0 ~ "overfit", 
+                                     length(FN) == 0 & length(FP) > 0 ~ "underfit", 
+                                     length(FN) > 0 & length(FP) > 0 ~ "underfit")
+}    
+
+table(S_mat_est_type)/length(S_mat_est_type)
+```
+
+
+## 2-3. exact / underfit / overfit
+
+
+### 2-3-1. Normal / Mixture error
+
+```{r}
+h <- tau_seq_real[2] - tau_seq_real[1]
+idx_tau <- (tau_seq >= 0.4 & tau_seq <= 0.6)
+RE <- vector("numeric", length = simul_times)
+
+for(simul in 1:simul_times) {
+  result <- simul_result[[simul]]
+  gamma_tau_hat <- est_gamma(Phi[idx_tau, ], result$theta)
+  EE_mat <-  lapply(gamma_tau_hat[-1], FUN = function(x) (x - sp_mat)*(x - sp_mat) * h) %>%
+    Reduce("+", .) 
+  RE_num <- EE_mat %>% apply(2, mean) %>% sum %>% sqrt
+  RE_denom <- lapply(gamma_tau_hat[-1], FUN = function(x) (x)*(x) * h) %>%
+    Reduce("+", .) %>% apply(2, mean) %>% sum %>% sqrt
+  RE[simul] <- RE_num/RE_denom
+}
+
+mean(RE) %>% round(2)
+
+```
+
+
+
+### 2-3-2. Location-scale
+
+```{r}
+h <- tau_seq_real[2] - tau_seq_real[1]
+idx_tau <- (tau_seq >= 0.4 & tau_seq <= 0.6)
+RE <- vector("numeric", length = simul_times)
+
+sp_mat_true_list <- list()
+b <- length(tau_seq)
+for(l in 1:b) {
+  temp_mat <- sp_mat
+  temp_mat[4,1] <- sp_mat[4,1] + qnorm(tau_seq[l])*10
+  sp_mat_true_list[[l]] <- temp_mat
+}
+
+for(simul in 1:simul_times) {
+  result <- simul_result[[simul]]
+  gamma_tau_hat <- est_gamma(Phi[idx_tau, ], result$theta)
+  EE_mat <- mapply(FUN = function(est, true) (est - true) * (est - true) * h, 
+                   est = gamma_tau_hat[-1], true = sp_mat_true_list[idx_tau][-1], SIMPLIFY = FALSE) %>%
+    Reduce("+", .)
+  RE_num <- EE_mat %>% apply(2, mean) %>% sum %>% sqrt
+  RE_denom <- lapply(gamma_tau_hat[-1], FUN = function(x) (x)*(x) * h) %>%
+    Reduce("+", .) %>% apply(2, mean) %>% sum %>% sqrt
+  RE[simul] <- RE_num/RE_denom
+}
+
+mean(RE) %>% round(2)
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
