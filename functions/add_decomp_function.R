@@ -542,3 +542,14 @@ SP_model_r <- function(delta, lambda, tol_error, max_iter, X, Y, V, Phi,
               iter_error = iter_error, 
               params = lambda))
 }
+
+SCAD_deriv <- function(x, lambda, a) {
+  if (abs(x) <= lambda) {
+    output <- lambda
+  } else if (lambda < abs(x) & abs(x) <= a*lambda) {
+    output <- (a*lambda - abs(x))/(a - 1)
+  } else {
+    output <- 0
+  }
+  return(output)
+}
