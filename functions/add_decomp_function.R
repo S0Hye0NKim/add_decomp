@@ -49,7 +49,7 @@ add_decomp_r <- function(delta, lambda_1, lambda_2, tol_error, max_iter, X, Y, V
         w_j_g <- w_old[(K*(j-1) +1):(j*K), g]
         r_j_g <- eta_j_g - (w_j_g/delta)
         norm_r_j_g <- (r_j_g^2) %>% sum %>% sqrt
-        value <- 1 - ((lambda_2 * weight_theta)/(delta *norm_r_j_g))
+        value <- 1 - ( weight_theta/(delta *norm_r_j_g))
         if(value >= 0) {
           theta_new[(K*(j-1) +1):(j*K), g] <- value * r_j_g
         } else {theta_new[(K*(j-1) +1):(j*K), g] <- 0}
@@ -66,9 +66,9 @@ add_decomp_r <- function(delta, lambda_1, lambda_2, tol_error, max_iter, X, Y, V
     if(weight == TRUE) {
       # weight = SCAD_deriv(singular value of Z)
       sing_val_Z_0 <- svd(Z_0) %>% .$d
-      weight_Z <- sapply(X = sing_val_Z_0, FUN = SCAD_deriv, lambda = lambda_1/(delta * b), a = 3.7)
+      weight_Z <- sapply(X = sing_val_Z_0, FUN = SCAD_deriv, lambda = lambda_1, a = 3.7)
     } else {weight_Z <- rep(1, length(svd(Z_0) %>% .$d))}  
-    new_singular <- sapply(SVD$d - (lambda_1 * weight_Z)/(delta*b), FUN = function(x) max(x, 0))
+    new_singular <- sapply(SVD$d - weight_Z/(delta*b), FUN = function(x) max(x, 0))
     Z_new <- SVD$u %*% diag(new_singular) %*% t(SVD$v)
     
     # Process for e
