@@ -90,7 +90,7 @@ List add_decomp(double delta, double lambda_1, double lambda_2, double tol_error
           double weight_theta = as<double>(wrap(SCAD_deriv(Named("x") = norm_theta_tilde_j_g, 
                                                            Named("lambda") = lambda_2, Named("a") = 3.7)));
           
-          value = 1 - ((lambda_2 * weight_theta)/(delta*norm_r_j_g));
+          value = 1 - (weight_theta/(delta*norm_r_j_g));
         } else {
           value = 1 - (lambda_2/(delta*norm_r_j_g));
         }
@@ -123,9 +123,9 @@ List add_decomp(double delta, double lambda_1, double lambda_2, double tol_error
       arma::vec weight_Z(len_Z_0_d);
       for(int idx=0; idx<len_Z_0_d;idx++) {
         weight_Z[idx] = as<double>(wrap(SCAD_deriv(Named("x") = Z_0_d[idx], 
-                                                   Named("lambda")=lambda_1/(delta * b), Named("a") = 3.7)));
+                                                   Named("lambda")=lambda_1, Named("a") = 3.7)));
       }
-      d_new = d - ((lambda_1/(delta * b)) * weight_Z);
+      d_new = d - ( weight_Z/(delta * b));
     } else {
       d_new = d - (lambda_1/(delta * b));
     }
