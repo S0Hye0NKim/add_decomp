@@ -219,6 +219,8 @@ List add_decomp(double delta, double lambda_1, double lambda_2, double tol_error
 List LR_model(double delta, double lambda, double tol_error, int max_iter, arma::mat X,
               arma::mat Y, arma::mat Z_0, NumericVector tau_seq, bool weight) {
   Function f("Reduce");
+  Function SCAD_deriv("SCAD_deriv");
+  
   //delta = step size
   //lambda = low rank penalty
   
@@ -261,10 +263,17 @@ List LR_model(double delta, double lambda, double tol_error, int max_iter, arma:
     arma::vec d_new;
     
     if(weight == true) {
-      d_new = d - lambda/(delta*b*Z_0_d);
+      int len_Z_0_d = Z_0_d.n_elem;
+      arma::vec weight_Z(len_Z_0_d);
+      for(int idx=0; idx<len_Z_0_d;idx++) {
+        weight_Z[idx] = as<double>(wrap(SCAD_deriv(Named("x") = Z_0_d[idx], 
+                                                   Named("lambda")=lambda, Named("a") = 3.7)));
+      }
+      d_new = d - (weight_Z/(delta * b));
     } else {
-      d_new = d - lambda/(delta*b);
+      d_new = d - (lambda/(delta * b));
     }
+    
     NumericVector diag_entry = ifelse(as<NumericVector>(wrap(d_new)) > 0, 
                                       as<NumericVector>(wrap(d_new)), 0);
     arma::mat D_new = diagmat(as<arma::vec>(wrap(diag_entry)));
@@ -340,6 +349,8 @@ List LR_model(double delta, double lambda, double tol_error, int max_iter, arma:
 List SP_model(double delta, double lambda, double tol_error, int max_iter, arma::mat X, arma::mat Y, 
               List V, arma::mat Phi, arma::mat theta_0, NumericVector tau_seq, bool weight) {
   Function f("Reduce");
+  Function SCAD_deriv("SCAD_deriv");
+  
   //delta = step size
   //lambda = sparse penalty
   
@@ -414,7 +425,9 @@ List SP_model(double delta, double lambda, double tol_error, int max_iter, arma:
         double norm_theta_tilde_j_g = sqrt(accum_theta_tilde_j_g);
         double value; 
         if(weight == true) {
-          value = 1 - (lambda/(delta*norm_r_j_g*norm_theta_tilde_j_g));
+          double weight_theta = as<double>(wrap(SCAD_deriv(Named("x") = norm_theta_tilde_j_g, 
+                                                           Named("lambda") = lambda, Named("a") = 3.7)));
+          value = 1 - (weight_theta/(delta*norm_r_j_g));
         } else {
           value = 1 - (lambda/(delta*norm_r_j_g));
         }
