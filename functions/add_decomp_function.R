@@ -395,12 +395,14 @@ LR_model_r <- function(delta, lambda, tol_error, max_iter, X, Y, Z_0, tau_seq, w
     SVD_obj <- svd(obj)
     SVD_Z_0 <- svd(Z_0)
     if(weight == TRUE) {
-      d_new <- SVD_obj$d - lambda/(delta*b*SVD_Z_0$d)
+      # weight = SCAD_deriv(singular value of Z)
+      sing_val_Z_0 <- svd(Z_0) %>% .$d
+      weight_Z <- sapply(X = sing_val_Z_0, FUN = SCAD_deriv, lambda = lambda, a = 3.7)
     } else {
-      d_new <- SVD_obj$d - lambda/(delta*b)
+      weight_Z <- rep(lambda, length(svd(Z_0) %>% .$d))
     }
-    diag_entry <- ifelse(d_new > 0, d_new, 0)
-    Z_new <- SVD_obj$u %*% diag(diag_entry) %*% t(SVD_obj$v)
+    d_new <- sapply(SVD_obj$d - weight_Z/(delta*b), FUN = function(x) max(x, 0))
+    Z_new <- SVD_obj$u %*% diag(d_new) %*% t(SVD_obj$v)
     
     # Process for e
     e_new <- list()
@@ -482,12 +484,14 @@ SP_model_r <- function(delta, lambda, tol_error, max_iter, X, Y, V, Phi,
       theta_new[1:K, g] <- eta_new[1:K, g] -  (w_old[1:K, g])/delta
       for(j in 2:(p+1)) {
         theta_tilde <- theta_0[(K*(j-1) +1):(j*K), g]
-        norm_theta_tilde <- ifelse(weight == TRUE, (theta_tilde^2) %>% sum %>% sqrt, 1)  # weight = 1/norm_theta_tilde
+        l2norm_theta_tilde <- (theta_tilde^2) %>% sum %>% sqrt
+        # weight = SCAD_deriv(||theta||_2)
+        weight_theta <- ifelse(weight == TRUE, SCAD_deriv(x = l2norm_theta_tilde, lambda = lambda, a = 3.7), lambda) 
         eta_j_g <- eta_new[(K*(j-1) +1):(j*K), g]
         w_j_g <- w_old[(K*(j-1) +1):(j*K), g]
         r_j_g <- eta_j_g - (w_j_g/delta)
         norm_r_j_g <- (r_j_g^2) %>% sum %>% sqrt
-        value <- 1 - (lambda/(delta *norm_r_j_g*norm_theta_tilde))
+        value <- 1 - ( weight_theta/(delta *norm_r_j_g))
         if(value >= 0) {
           theta_new[(K*(j-1) +1):(j*K), g] <- value * r_j_g
         } else {theta_new[(K*(j-1) +1):(j*K), g] <- 0}
