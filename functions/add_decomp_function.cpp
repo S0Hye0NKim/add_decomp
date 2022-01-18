@@ -9,7 +9,6 @@ List add_decomp(double delta, double lambda_1, double lambda_2, double tol_error
                 arma::mat Y, List V, arma::mat Phi, arma::mat theta_0, arma::mat Z_0, NumericVector tau_seq,
                 bool weight) {
   Function f("Reduce");
-  Function SCAD_deriv("SCAD_deriv");
   
   //delta = step size
   //lambda_1 = low rank penalty
@@ -87,8 +86,16 @@ List add_decomp(double delta, double lambda_1, double lambda_2, double tol_error
         double norm_theta_tilde_j_g = sqrt(accum_theta_tilde_j_g);
         double value; 
         if(weight == true) {
-          double weight_theta = as<double>(wrap(SCAD_deriv(Named("x") = norm_theta_tilde_j_g, 
-                                                           Named("lambda") = lambda_2, Named("a") = 3.7)));
+          // weight = SCAD_deriv(||theta_0||)
+          double weight_theta;
+          
+          if(norm_theta_tilde_j_g < lambda_2) {
+            weight_theta = lambda_2;
+          } else if (norm_theta_tilde_j_g < lambda_2 * 3.7) {
+            weight_theta = (3.7 * lambda_2 - norm_theta_tilde_j_g) / (3.7 - 1);
+          } else {
+            weight_theta = 0;
+          }
           
           value = 1 - (weight_theta/(delta*norm_r_j_g));
         } else {
@@ -119,13 +126,24 @@ List add_decomp(double delta, double lambda_1, double lambda_2, double tol_error
     arma::vec d_new;
     
     if(weight == true) {
+      // weight = SCAD_deriv(singular value of Z_0)
       int len_Z_0_d = Z_0_d.n_elem;
       arma::vec weight_Z(len_Z_0_d);
       for(int idx=0; idx<len_Z_0_d;idx++) {
-        weight_Z[idx] = as<double>(wrap(SCAD_deriv(Named("x") = Z_0_d[idx], 
-                                                   Named("lambda")=lambda_1, Named("a") = 3.7)));
+        double abs_x = Z_0_d[idx];
+        double SCAD_deriv_d;
+        
+        if(abs_x < lambda_1) {
+          SCAD_deriv_d = lambda_1;
+        } else if(abs_x < lambda_1 * 3.7) {
+          SCAD_deriv_d = (3.7 * lambda_1 - abs_x) / (3.7 - 1);
+        } else {
+          SCAD_deriv_d = 0;
+        }
+        
+        weight_Z[idx] = SCAD_deriv_d;
       }
-      d_new = d - ( weight_Z/(delta * b));
+      d_new = d - (weight_Z/(delta * b));
     } else {
       d_new = d - (lambda_1/(delta * b));
     }
@@ -219,7 +237,6 @@ List add_decomp(double delta, double lambda_1, double lambda_2, double tol_error
 List LR_model(double delta, double lambda, double tol_error, int max_iter, arma::mat X,
               arma::mat Y, arma::mat Z_0, NumericVector tau_seq, bool weight) {
   Function f("Reduce");
-  Function SCAD_deriv("SCAD_deriv");
   
   //delta = step size
   //lambda = low rank penalty
@@ -263,11 +280,22 @@ List LR_model(double delta, double lambda, double tol_error, int max_iter, arma:
     arma::vec d_new;
     
     if(weight == true) {
+      // weight = SCAD_deriv(singular value of Z_0)
       int len_Z_0_d = Z_0_d.n_elem;
       arma::vec weight_Z(len_Z_0_d);
       for(int idx=0; idx<len_Z_0_d;idx++) {
-        weight_Z[idx] = as<double>(wrap(SCAD_deriv(Named("x") = Z_0_d[idx], 
-                                                   Named("lambda")=lambda, Named("a") = 3.7)));
+        double abs_x = Z_0_d[idx];
+        double SCAD_deriv_d;
+        
+        if(abs_x < lambda) {
+          SCAD_deriv_d = lambda;
+        } else if(abs_x < lambda * 3.7) {
+          SCAD_deriv_d = (3.7 * lambda - abs_x) / (3.7 - 1);
+        } else {
+          SCAD_deriv_d = 0;
+        }
+        
+        weight_Z[idx] = SCAD_deriv_d;
       }
       d_new = d - (weight_Z/(delta * b));
     } else {
@@ -349,7 +377,6 @@ List LR_model(double delta, double lambda, double tol_error, int max_iter, arma:
 List SP_model(double delta, double lambda, double tol_error, int max_iter, arma::mat X, arma::mat Y, 
               List V, arma::mat Phi, arma::mat theta_0, NumericVector tau_seq, bool weight) {
   Function f("Reduce");
-  Function SCAD_deriv("SCAD_deriv");
   
   //delta = step size
   //lambda = sparse penalty
@@ -425,8 +452,17 @@ List SP_model(double delta, double lambda, double tol_error, int max_iter, arma:
         double norm_theta_tilde_j_g = sqrt(accum_theta_tilde_j_g);
         double value; 
         if(weight == true) {
-          double weight_theta = as<double>(wrap(SCAD_deriv(Named("x") = norm_theta_tilde_j_g, 
-                                                           Named("lambda") = lambda, Named("a") = 3.7)));
+          // weight = SCAD_deriv(||theta_0||)
+          double weight_theta;
+          
+          if(norm_theta_tilde_j_g < lambda) {
+            weight_theta = lambda;
+          } else if (norm_theta_tilde_j_g < lambda * 3.7) {
+            weight_theta = (3.7 * lambda - norm_theta_tilde_j_g) / (3.7 - 1);
+          } else {
+            weight_theta = 0;
+          }
+          
           value = 1 - (weight_theta/(delta*norm_r_j_g));
         } else {
           value = 1 - (lambda/(delta*norm_r_j_g));
