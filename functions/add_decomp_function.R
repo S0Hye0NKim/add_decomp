@@ -288,25 +288,9 @@ LR_model_BIC <- function(X, Y, Z_0, tau_seq, tau_seq_real, delta, lamb_seq, max_
   
   names(BIC) <- lamb_seq
   BIC_data <- BIC %>% bind_rows(.id = "lambda") %>%
-    mutate(term = (r_hat * max(r_X, m))/(2*n*m), 
-           BIC_log_sum = log_Q + log(p+m)*term, 
-           BIC_log_p = log_Q + log(p)*term, 
-           BIC_log_n = log_Q + log(n)*term, 
-           BIC_llog_p = log_Q + log(log(p))*term,
-           BIC_llog_n = log_Q + log(log(n))*term) %>%
-    group_by(lambda) %>%
-    select_at(vars(starts_with("BIC"))) %>%
-    ungroup()
+    mutate(term = (r_hat * max(r_X, m))/(2*n*m))
   
-  BIC_val_min <- apply(select_at(BIC_data, vars(starts_with("BIC"))), 2, min) %>%
-    `names<-`(value = c("log_sum", "log_p", "log_n", "llog_p", "llog_n"))
-  
-  min_BIC <- filter(BIC_data, BIC_log_sum == BIC_val_min["log_sum"]| BIC_log_p == BIC_val_min["log_p"] |
-                      BIC_log_n == BIC_val_min["log_n"] | BIC_llog_p == BIC_val_min["llog_p"] | 
-                      BIC_llog_n == BIC_val_min["llog_n"])
-  
-  output <- list(min_BIC = min_BIC, 
-                 BIC_data = BIC_data, 
+  output <- list(BIC_data = BIC_data, 
                  simulation = simulation)
   
   return(output)
