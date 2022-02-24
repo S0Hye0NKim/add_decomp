@@ -8,7 +8,6 @@ output: html_document
 # 0. Load packages
 
 ```{r warning = FALSE, message = FLASE}
-setwd("C:/Users/Sohyeon Kim/add_decomp_linux")
 library(tidyverse)
 library(Matrix)
 library(foreach)
@@ -18,7 +17,7 @@ library(glmnet)
 library(fda)
 library(expm)
 
-sourceCpp("[KSH]add_decomp_function.cpp")
+sourceCpp("C:/Users/kshye/add_decomp/functions/add_decomp_function.cpp")
 source("https://raw.githubusercontent.com/S0Hye0NKim/add_decomp/master/functions/add_decomp_function.R")
 ```
 
@@ -97,7 +96,7 @@ sp_table %>%
 ```
 
 
-## 2-2. Relative Error
+## 2-2. exact / underfit / overfit
 
 
 ```{r}
@@ -123,11 +122,12 @@ for(simul in 1:simul_times) {
                                      length(FN) > 0 & length(FP) > 0 ~ "underfit")
 }    
 
-table(S_mat_est_type)/length(S_mat_est_type)
+S_mat_est_type %>% factor(levels = c("exact", "underfit", "overfit")) %>%
+  table() / length(S_mat_est_type)
 ```
 
 
-## 2-3. exact / underfit / overfit
+## 2-3. Relative error
 
 
 ### 2-3-1. Normal / Mixture error
@@ -161,11 +161,13 @@ h <- tau_seq_real[2] - tau_seq_real[1]
 idx_tau <- (tau_seq >= 0.4 & tau_seq <= 0.6)
 RE <- vector("numeric", length = simul_times)
 
+inc_func_idx <- which(sp_mat[-1, 1] != 0)
+
 sp_mat_true_list <- list()
 b <- length(tau_seq)
 for(l in 1:b) {
   temp_mat <- sp_mat
-  temp_mat[4,1] <- sp_mat[4,1] + qnorm(tau_seq[l])*10
+  temp_mat[inc_func_idx + 1,1] <- sp_mat[inc_func_idx + 1,1] + qnorm(tau_seq[l])*3
   sp_mat_true_list[[l]] <- temp_mat
 }
 
