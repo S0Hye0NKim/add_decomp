@@ -22,13 +22,13 @@ source("https://raw.githubusercontent.com/S0Hye0NKim/add_decomp/master/functions
 #################
 
 ## Generate data
-set.seed(3)
+set.seed(4)
 n <- 400
 m <- 10
 p <- 800
 b <- 15
 num_rank <- 3
-num_rank_X <- 300
+num_rank_X <- 200
 simul_times <- 25
 
 sigma_mat <- matrix(nrow = p, ncol = p)
@@ -55,7 +55,6 @@ LR_mat <- L1 %*% t(L2)
 X_list <- list()
 eps_list <- list()
 
-set.seed(1)
 for(simul in 1:simul_times) {
   X1 <- matrix(rnorm(n*num_rank_X, mean = 0, sd = 1), nrow = n)
   X2 <- matrix(rnorm(p*num_rank_X, mean = 0, sd = 1), nrow = p)
@@ -74,7 +73,7 @@ Y_list <- mapply(FUN = function(X, LR, SP, eps) X[, -1] %*% LR_mat + X %*% SP + 
 
 
 ### Calculate kronecker product
-K <- 5
+K <- (2 * n^(1/5)) %>% round
 tau_seq <- seq(from = 0.35, to = 0.65, length.out = b)
 tau_seq_real <- tau_seq[tau_seq >= 0.4 & tau_seq  <= 0.6]
 idx_tau <- (tau_seq >= "0.4" & tau_seq <= "0.6")
@@ -86,6 +85,7 @@ V_list <- list()
 for(simul in 1:simul_times) {
   V_list[[simul]] <- calc_V(X_list[[simul]], Phi)
 }
+
 
 
 #########################
@@ -114,7 +114,7 @@ for(simul in 1:simul_times) {
         }
     }
   
-    init_val_SP[[simul]] <- SP_model_r(delta = 1, lambda = 0.01, tol_error = 0.1^5, max_iter = 50, 
+    init_val_SP[[simul]] <- SP_model(delta = 1, lambda = 0.01, tol_error = 0.1^5, max_iter = 50, 
                             X = X, Y = Y, V = V, Phi = Phi, theta_0 = first_init_SP, tau_seq = tau_seq, weight = FALSE)
 
     Y_modified <- Y - X%*%lasso_coef
@@ -127,7 +127,7 @@ for(simul in 1:simul_times) {
     alpha_init <- ridge_coef_AD
 
 
-    init_val_AD[[simul]] <- add_decomp_r(delta = 1, lambda_1 = 0.01, lambda_2 = 0.001, tol_error = 0.1^5, max_iter = 50,
+    init_val_AD[[simul]] <- add_decomp(delta = 1, lambda_1 = 0.01, lambda_2 = 0.01, tol_error = 0.1^5, max_iter = 50,
                                        X = X, Y = Y, V = V, Phi = Phi, 
                                        theta_0 = init_val_SP[[simul]]$theta, Z_0 = X%*%alpha_init, tau_seq = tau_seq, weight = FALSE)
     
@@ -139,7 +139,7 @@ for(simul in 1:simul_times) {
     }
   first_init_LR <- ridge_coef_LR
   
-  init_val_LR[[simul]] <- LR_model(delta = 1, lambda = 1, tol_error = 0.1^5, max_iter = 50, 
+  init_val_LR[[simul]] <- LR_model(delta = 1, lambda = 0.01, tol_error = 0.1^5, max_iter = 50, 
                             X = X, Y = Y, Z_0 = X %*% first_init_LR, tau_seq = tau_seq, weight = FALSE)
 }
 
@@ -155,9 +155,9 @@ for(simul in 1:simul_times) {
   V <- V_list[[simul]]
   init_val <- init_val_AD[[simul]]
   
-  log_lamb1 <- c( seq(3.5, 4.3, length.out = 20))
+  log_lamb1 <- c( seq(3.5, 4.17, length.out = 20))
   lamb1_seq <- exp(log_lamb1)
-  log_lamb2 <- c(seq(5, 6.5, length.out = 20))
+  log_lamb2 <- c(seq(4.65, 4.8, length.out = 20))
   lamb2_seq <- exp(log_lamb2)
   
   BIC_table <- list()
@@ -169,10 +169,7 @@ for(simul in 1:simul_times) {
     
     temp_BIC <- foreach(lamb2 = lamb2_seq, .noexport = "add_decomp") %dopar% {
       library(dplyr)
-      library(splines)
       library(Matrix)
-      library(glmnet)
-      library(fda)
       library(Rcpp)
       sourceCpp("[KSH]add_decomp_function.cpp")
       
@@ -196,8 +193,8 @@ for(simul in 1:simul_times) {
     filter(S_hat_net != 0) %>%
     arrange(BIC) %>%  
     head(1)
-  
-  result <- add_decomp_r(delta = 1, lambda_1 = BIC_params$lambda_1, lambda_2 = BIC_params$lambda_2, 
+
+  result <- add_decomp(delta = 1, lambda_1 = BIC_params$lambda_1, lambda_2 = BIC_params$lambda_2, 
                        tol_error = 0.1^5, max_iter = 50, X, Y, V, Phi, 
                        theta_0 = init_val$theta, Z_0 = init_val$Z, tau_seq = tau_seq, weight = TRUE)
   
@@ -213,23 +210,25 @@ cl <- makeCluster(20) #not to overload your computer
 registerDoParallel(cl) # Ready to parallel
 simul_LR_model <- foreach(simul = 1:simul_times, .noexport = "add_decomp") %dopar% {
   library(dplyr)
-  library(splines)
   library(Matrix)
-  library(glmnet)
-  library(fda)
   
   X <- X_list[[simul]]
   Y <- Y_list[[simul]]
   init_val <- init_val_LR[[simul]]
   
-  lamb_seq <- seq(0.1, 1, length.out = 20)
+  lamb_seq <- seq(0.1, 5, length.out = 20)
   r_X <- rankMatrix(X[, -1])
   BIC_simul <- LR_model_BIC(X, Y, Z_0 = init_val$Z, tau_seq, tau_seq_real, lamb_seq, max_iter = 50, delta = 1, r_X = rankMatrix(X[, -1]))
   
-  BIC_params <- BIC_simul$min_BIC %>%
-    arrange(BIC_log_p) %>%
-    head(1)
-  
+  r_X <- rankMatrix(X[, -1])[1]
+  BIC_params <- BIC_simul$BIC_data %>%
+                  mutate(LR_part = r_hat * max(r_X, m) / (2*n*m), 
+                         LR = log(p) * log(log(n)) * LR_part, 
+                         BIC = log_Q + LR) %>%
+                  mutate_all(as.numeric) %>%
+                  arrange(BIC) %>% 
+                  head(1)
+
   result <- BIC_simul$simulation[[which(lamb_seq == BIC_params$lambda)]]
   
   result
@@ -249,7 +248,7 @@ for(simul in 1:simul_times) {
   V <- V_list[[simul]]
   init_val <- init_val_SP[[simul]]
   
-  log_lamb <- c(seq(1, 6.5, length.out = 20))
+  log_lamb <- c(seq(1, 4.8, length.out = 20))
   lamb_seq <- exp(log_lamb)
   
   BIC_table <- list()
@@ -273,11 +272,15 @@ for(simul in 1:simul_times) {
   
   BIC_params <- BIC_table %>%
     bind_rows() %>%
-    arrange(BIC_log_p) %>%
+    mutate(S_hat_net = S_hat - num_nz_intercept,
+           SP = log(p) * log(log(n)) * K * S_hat_net / (2*n*m),
+           BIC = log_Q + SP) %>%
     mutate_all(as.numeric) %>%
+    filter(S_hat_net != 0) %>%
+    arrange(BIC) %>%  
     head(1)
-  
-  result <- SP_model_r(delta = 1, lambda = BIC_params$lambda, tol_error = 0.1^5, max_iter = 50, 
+
+  result <- SP_model(delta = 1, lambda = BIC_params$lambda, tol_error = 0.1^5, max_iter = 50, 
                      X = X, Y = Y, V = V, Phi = Phi, theta_0 = init_val$theta, tau_seq = tau_seq, weight = TRUE)
   simul_SP_model[[simul]] <- result
 }
@@ -289,5 +292,3 @@ for(simul in 1:simul_times) {
 
 save(simul_add_decomp, simul_LR_model, simul_SP_model, est_gamma, check_sp_table, 
      LR_mat, sp_mat, Phi, tau_seq, tau_seq_real, X_list, file = "ksh_simul_mixture_error_n_p_400_800_1st.RData")
-
-
