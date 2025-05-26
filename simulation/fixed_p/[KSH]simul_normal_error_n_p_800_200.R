@@ -286,3 +286,4 @@ for(simul in 1:simul_times) {
 
 save(simul_add_decomp, simul_LR_model, simul_SP_model, est_gamma, check_sp_table, 
      LR_mat, sp_mat, Phi, tau_seq, tau_seq_real, X_list, file = "ksh_simul_normal_error_n_p_800_200.RData")
+
